@@ -29,7 +29,7 @@ RUN set -eux; \
 			cc=aarch64-linux-gnu-gcc; \
 			dpkg --add-architecture arm64; \
 			apt-get update; \
-			apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu; \
+			apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libc6-dev-arm64-cross linux-libc-dev-arm64-cross; \
 			;; \
 		arm/v5) \
 			target_pkg_arch=armel; \
@@ -38,7 +38,7 @@ RUN set -eux; \
 			cc=arm-linux-gnueabi-gcc; \
 			dpkg --add-architecture armel; \
 			apt-get update; \
-			apt-get install -y --no-install-recommends gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi; \
+			apt-get install -y --no-install-recommends gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi libc6-dev-armel-cross linux-libc-dev-armel-cross; \
 			;; \
 		*) echo "unsupported target platform ${TARGETOS}/${TARGETARCH}/${TARGETVARIANT}" >&2; exit 1;; \
 	esac; \
