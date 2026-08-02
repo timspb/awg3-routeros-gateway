@@ -2,7 +2,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-FROM --platform=$TARGETPLATFORM golang:1.25-bookworm AS build
+FROM --platform=$TARGETPLATFORM golang:1.23-bookworm AS build
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -12,6 +12,7 @@ ARG AWG_GO_COMMIT=cf9d2dd202821301f7039093b0a1b3d4b574c47c
 ARG AWG_TOOLS_REPO=https://github.com/amnezia-vpn/amneziawg-tools.git
 ARG AWG_TOOLS_COMMIT=d09ecc38425082e472368dd2bf8c4c42d10cae03
 ENV DEBIAN_FRONTEND=noninteractive
+ENV GOTOOLCHAIN=auto
 WORKDIR /src
 COPY . .
 RUN set -eux; \
@@ -87,7 +88,7 @@ RUN set -eux; \
 		--sysctl /usr/sbin/sysctl \
 		--sysctl-source /rootfs/usr/sbin/sysctl
 
-FROM --platform=$TARGETPLATFORM golang:1.25-bookworm AS test
+FROM --platform=$TARGETPLATFORM golang:1.23-bookworm AS test
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /src
 COPY . .
