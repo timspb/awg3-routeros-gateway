@@ -81,8 +81,12 @@ RUN set -eux; \
 		procps_deb="$(ls procps_*_${target_pkg_arch}.deb)"; \
 		dpkg-deb -x "${ip_deb}" /tmp/pkgroot-ip; \
 		dpkg-deb -x "${procps_deb}" /tmp/pkgroot-procps; \
-		install -D -m 0755 /tmp/pkgroot-ip/usr/sbin/ip /rootfs/usr/sbin/ip; \
-		install -D -m 0755 /tmp/pkgroot-procps/usr/sbin/sysctl /rootfs/usr/sbin/sysctl; \
+		ip_src="$(find /tmp/pkgroot-ip -type f -name ip -perm -111 | head -n 1)"; \
+		sysctl_src="$(find /tmp/pkgroot-procps -type f -name sysctl -perm -111 | head -n 1)"; \
+		test -n "${ip_src}"; \
+		test -n "${sysctl_src}"; \
+		install -D -m 0755 "${ip_src}" /rootfs/usr/sbin/ip; \
+		install -D -m 0755 "${sysctl_src}" /rootfs/usr/sbin/sysctl; \
 		ip_version="$(apt-cache madison "iproute2:${target_pkg_arch}" | head -n 1 | awk '{print $3}')"; \
 		procps_version="$(apt-cache madison "procps:${target_pkg_arch}" | head -n 1 | awk '{print $3}')"; \
 	fi; \
