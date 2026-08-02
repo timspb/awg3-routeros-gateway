@@ -162,6 +162,32 @@ func TestVerifyManifestRejectsNonExecutable(t *testing.T) {
 	}
 }
 
+func TestVerifyManifestAcceptsNonELFExecutable(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "artifact.sh")
+	data := []byte("#!/bin/sh\nexit 0\n")
+	if err := os.WriteFile(path, data, 0o755); err != nil {
+		t.Fatalf("write script failed: %v", err)
+	}
+	sum := sha256.Sum256(data)
+	manifest := Manifest{
+		Artifacts: []Artifact{{
+			Name:            "smoke-helper",
+			Path:            path,
+			SHA256:          hex.EncodeToString(sum[:]),
+			OS:              runtime.GOOS,
+			Arch:            runtime.GOARCH,
+			SourceRepo:      "repo",
+			SourceCommit:    "commit",
+			BuildRecipe:     "recipe",
+			ToolchainDigest: "toolchain",
+		}},
+	}
+	if err := VerifyManifest(manifest, path); err != nil {
+		t.Fatalf("expected non-ELF executable to pass: %v", err)
+	}
+}
+
 func TestManifestLoad(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "manifest.json")
 	data := []byte(`{"artifacts":[{"name":"gateway","path":"/gateway","sha256":"` + stringsRepeat("1", 64) + `","os":"linux","arch":"amd64","source_repo":"repo","source_commit":"commit","build_recipe":"recipe","toolchain_digest":"toolchain"}]}`)

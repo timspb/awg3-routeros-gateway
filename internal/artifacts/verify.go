@@ -1,6 +1,7 @@
 package artifacts
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -62,13 +63,19 @@ func verifyArtifact(artifact Artifact) error {
 	if sum != artifact.SHA256 {
 		return errors.New("sha256 mismatch")
 	}
-	f, err := elf.Open(artifact.Path)
+	isELF, err := isELFArtifact(artifact.Path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	if err := verifyELF(f, artifact); err != nil {
-		return err
+	if isELF {
+		f, err := elf.Open(artifact.Path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if err := verifyELF(f, artifact); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -104,4 +111,21 @@ func verifyELF(f *elf.File, artifact Artifact) error {
 		return fmt.Errorf("unsupported arch %q", artifact.Arch)
 	}
 	return nil
+}
+
+func isELFArtifact(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	var magic [4]byte
+	n, err := io.ReadFull(f, magic[:])
+	if err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return false, nil
+		}
+		return false, err
+	}
+	return n == len(magic) && bytes.Equal(magic[:], []byte{0x7f, 'E', 'L', 'F'}), nil
 }

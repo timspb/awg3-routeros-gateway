@@ -13,6 +13,7 @@ rm -f "${STATE_DIR}/gateway.log" "${STATE_DIR}/amneziawg-go.pid"
 	--mode run \
 	--config /smoke/awg3.json \
 	--secrets /smoke/secrets.json \
+	--artifact-manifest /etc/awg3/runtime-artifacts-smoke.json \
 	--status-listen 127.0.0.1:18080 \
 	--config-listen 127.0.0.1:18081 \
 	--runtime-binary /smoke/bin/amneziawg-go \

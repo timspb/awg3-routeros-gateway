@@ -136,6 +136,33 @@ RUN set -eux; \
 		--sysctl /usr/sbin/sysctl \
 		--sysctl-source /rootfs/usr/sbin/sysctl \
 		--pkg-commit "${ip_version} ${procps_version} ${binutils_version}"
+	go run ./cmd/artifactgen \
+		--output /rootfs/etc/awg3/runtime-artifacts-smoke.json \
+		--os "${TARGETOS}" \
+		--arch "${TARGETARCH}" \
+		--variant "${TARGETVARIANT}" \
+		--self-repo "file://awg3routerosgateway" \
+		--self-commit "${GATEWAY_SOURCE_COMMIT}" \
+		--go-repo "${AWG_GO_REPO}" \
+		--go-commit "${AWG_GO_COMMIT}" \
+		--tools-repo "${AWG_TOOLS_REPO}" \
+		--tools-commit "${AWG_TOOLS_COMMIT}" \
+		--pkg-repo "debian:bookworm-slim" \
+		--build-recipe "${build_recipe_digest}" \
+		--toolchain-digest "${toolchain_digest}" \
+		--gateway /gateway \
+		--gateway-source /rootfs/gateway \
+		--runtime /smoke/bin/amneziawg-go \
+		--runtime-source /src/build/smoke/bin/amneziawg-go \
+		--tools /smoke/bin/awg \
+		--tools-source /src/build/smoke/bin/awg \
+		--parser /usr/local/bin/awg3-parser-validate \
+		--parser-source /rootfs/usr/local/bin/awg3-parser-validate \
+		--ip /smoke/bin/ip \
+		--ip-source /src/build/smoke/bin/ip \
+		--sysctl /smoke/bin/sysctl \
+		--sysctl-source /src/build/smoke/bin/sysctl \
+		--pkg-commit "${ip_version} ${procps_version} ${binutils_version}"
 
 FROM --platform=$BUILDPLATFORM golang:1.25-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58 AS test
 ENV DEBIAN_FRONTEND=noninteractive
@@ -170,6 +197,7 @@ ENTRYPOINT ["/gateway"]
 
 FROM runtime AS smoke
 COPY build/smoke/ /smoke/
+COPY --from=build /rootfs/etc/awg3/runtime-artifacts-smoke.json /etc/awg3/runtime-artifacts-smoke.json
 RUN set -eux; \
 	chmod 0600 /smoke/awg3.json /smoke/secrets.json; \
 	chmod 0755 /smoke/runtime-smoke.sh /smoke/bin/amneziawg-go /smoke/bin/awg /smoke/bin/ip /smoke/bin/sysctl; \
