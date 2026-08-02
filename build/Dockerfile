@@ -135,7 +135,7 @@ RUN set -eux; \
 		--ip-source /rootfs/usr/sbin/ip \
 		--sysctl /usr/sbin/sysctl \
 		--sysctl-source /rootfs/usr/sbin/sysctl \
-		--pkg-commit "${ip_version} ${procps_version} ${binutils_version}" \
+		--pkg-commit "${ip_version} ${procps_version} ${binutils_version}"; \
 	go run ./cmd/artifactgen \
 		--output /rootfs/etc/awg3/runtime-artifacts-smoke.json \
 		--os "${TARGETOS}" \
