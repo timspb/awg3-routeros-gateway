@@ -65,20 +65,10 @@ func (a *RouteEndpointExclusionAdapter) Restore(ctx context.Context, pair config
 }
 
 func (a *RouteEndpointExclusionAdapter) Cleanup(ctx context.Context, pair config.Pair) error {
-	spec, err := a.specFromPair(pair)
-	if err != nil {
-		return err
-	}
-	if spec.owner != "container" {
-		return nil
-	}
 	a.mu.Lock()
 	current := a.current
 	a.mu.Unlock()
-	if current == nil {
-		return nil
-	}
-	if current.spec.target != spec.target {
+	if current == nil || !current.managed || current.spec.owner != "container" {
 		return nil
 	}
 	if err := a.deleteRoute(ctx, current.spec); err != nil {

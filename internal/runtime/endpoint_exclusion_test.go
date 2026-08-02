@@ -110,6 +110,32 @@ func TestRouteEndpointExclusionRestoreReplacesCandidateAndRemovesCandidateRoute(
 	}
 }
 
+func TestRouteEndpointExclusionCleanupIsNoopBeforeApply(t *testing.T) {
+	adapter := NewRouteEndpointExclusionAdapter()
+	if err := adapter.Cleanup(context.Background(), config.Pair{}); err != nil {
+		t.Fatalf("cleanup before apply failed: %v", err)
+	}
+}
+
+func TestRouteEndpointExclusionCleanupUsesAppliedState(t *testing.T) {
+	factory := &routeCommandFactory{routeGetOutputs: map[string]string{
+		"203.0.113.10": "203.0.113.10 via 10.99.99.1 dev eth0 src 10.99.99.2 table main",
+	}}
+	adapter := NewRouteEndpointExclusionAdapter()
+	adapter.CommandFactory = factory
+	pair := endpointExclusionPair("gen-cleanup", "203.0.113.10:443", "awg3")
+	if err := adapter.Apply(context.Background(), pair); err != nil {
+		t.Fatalf("apply failed: %v", err)
+	}
+	if err := adapter.Cleanup(context.Background(), config.Pair{}); err != nil {
+		t.Fatalf("cleanup failed: %v", err)
+	}
+	got := strings.Join(factory.calls, "\n")
+	if !strings.Contains(got, "ip route del 203.0.113.10/32 table main") {
+		t.Fatalf("applied route was not removed during cleanup:\n%s", got)
+	}
+}
+
 type routeCommandFactory struct {
 	routeGetOutputs map[string]string
 	routeGetErr     error

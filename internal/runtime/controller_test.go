@@ -404,7 +404,7 @@ func TestControllerShutdownStopsRunningRuntime(t *testing.T) {
 	}
 }
 
-func TestControllerShutdownDoesNotCleanupNetworkState(t *testing.T) {
+func TestControllerShutdownCleansNetworkState(t *testing.T) {
 	done := make(chan struct{})
 	network := &shutdownCleanupNetwork{}
 	ctrl, err := New(func(context.Context, config.Pair) (Process, error) {
@@ -419,13 +419,52 @@ func TestControllerShutdownDoesNotCleanupNetworkState(t *testing.T) {
 	if err := ctrl.Shutdown(context.Background()); err != nil {
 		t.Fatalf("shutdown failed: %v", err)
 	}
-	if network.cleanupCount != 0 {
-		t.Fatalf("expected shutdown to skip network cleanup, cleanupCount=%d", network.cleanupCount)
+	if network.cleanupCount != 1 {
+		t.Fatalf("expected shutdown to clean network state once, cleanupCount=%d", network.cleanupCount)
 	}
 	select {
 	case <-done:
 	default:
 		t.Fatalf("expected runtime to be stopped during shutdown")
+	}
+}
+
+func TestControllerShutdownBeforeStartIsNoop(t *testing.T) {
+	network := &shutdownCleanupNetwork{}
+	ctrl, err := New(func(context.Context, config.Pair) (Process, error) {
+		return &shutdownProcess{done: make(chan struct{}), pid: 5355}, nil
+	}, nil, network, IgnoreStop)
+	if err != nil {
+		t.Fatalf("new controller failed: %v", err)
+	}
+	if err := ctrl.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown failed: %v", err)
+	}
+	if network.cleanupCount != 0 {
+		t.Fatalf("expected shutdown before start to be a no-op, cleanupCount=%d", network.cleanupCount)
+	}
+}
+
+func TestControllerRepeatedShutdownIsSafe(t *testing.T) {
+	done := make(chan struct{})
+	network := &shutdownCleanupNetwork{}
+	ctrl, err := New(func(context.Context, config.Pair) (Process, error) {
+		return &shutdownProcess{done: done, pid: 5356}, nil
+	}, nil, network, IgnoreStop)
+	if err != nil {
+		t.Fatalf("new controller failed: %v", err)
+	}
+	if err := ctrl.Start(context.Background(), pairForRuntime("gen-shutdown-repeat")); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	if err := ctrl.Shutdown(context.Background()); err != nil {
+		t.Fatalf("first shutdown failed: %v", err)
+	}
+	if err := ctrl.Shutdown(context.Background()); err != nil {
+		t.Fatalf("second shutdown failed: %v", err)
+	}
+	if network.cleanupCount != 1 {
+		t.Fatalf("expected repeated shutdown to clean once, cleanupCount=%d", network.cleanupCount)
 	}
 }
 

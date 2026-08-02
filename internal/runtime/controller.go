@@ -268,27 +268,9 @@ func (c *Controller) Shutdown(ctx context.Context) error {
 	c.mu.Lock()
 	current := c.current
 	degraded := c.status.Degraded
-	if current != nil && !degraded {
-		current.stopping = true
-	}
 	c.mu.Unlock()
 	if current != nil && !degraded {
-		_ = c.stopProcess(ctx, current.process)
-		c.mu.Lock()
-		if c.current != nil && c.current.process == current.process {
-			c.current = nil
-			c.status.Running = false
-			c.status.Ready = false
-			c.status.Degraded = false
-			c.status.DegradedReason = ""
-			c.status.ContendedPID = 0
-			c.status.ContendedGeneration = ""
-			c.status.PID = 0
-			c.status.StoppedAt = time.Now().UTC()
-			c.restartWindowStart = time.Time{}
-			c.status.RestartCount = 0
-		}
-		c.mu.Unlock()
+		_ = c.Stop(ctx)
 	}
 	c.lifecycleCancel()
 	done := make(chan struct{})
