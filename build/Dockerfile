@@ -165,6 +165,7 @@ ENTRYPOINT ["/gateway"]
 FROM runtime AS smoke
 COPY build/smoke/ /smoke/
 RUN set -eux; \
+	chmod 0600 /smoke/secrets.json; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends file; \
 	rm -rf /var/lib/apt/lists/*; \
