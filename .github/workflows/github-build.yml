@@ -34,43 +34,43 @@ jobs:
         run: docker buildx inspect --bootstrap
 
       - name: Bake test
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" test --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" test --progress=plain
 
       - name: Bake amd64 image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-amd64 --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-amd64 --progress=plain
 
       - name: Bake amd64 footprint image
         run: |
           set -euo pipefail
           mkdir -p build/evidence
-          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" footprint-amd64 --progress=plain
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" footprint-amd64 --progress=plain
 
       - name: Bake arm64 image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-arm64 --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-arm64 --progress=plain
 
       - name: Bake armv5 image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-armv5 --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-armv5 --progress=plain
 
       - name: Bake multiarch image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-multiarch --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-multiarch --progress=plain
 
       - name: Bake smoke
         run: |
           set -euo pipefail
           mkdir -p build/evidence
-          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke --progress=plain 2>&1 | tee build/evidence/smoke.log
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke --progress=plain 2>&1 | tee build/evidence/smoke.log
 
       - name: Bake smoke arm64
         run: |
           set -euo pipefail
           mkdir -p build/evidence
-          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke-arm64 --progress=plain 2>&1 | tee build/evidence/smoke-arm64.log
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke-arm64 --progress=plain 2>&1 | tee build/evidence/smoke-arm64.log
 
       - name: Bake smoke armv5
         run: |
           set -euo pipefail
           mkdir -p build/evidence
-          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke-armv5 --progress=plain 2>&1 | tee build/evidence/smoke-armv5.log
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "*.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke-armv5 --progress=plain 2>&1 | tee build/evidence/smoke-armv5.log
 
       - name: Build footprint report
         run: |
