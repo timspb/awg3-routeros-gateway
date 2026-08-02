@@ -2,7 +2,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-FROM --platform=$TARGETPLATFORM golang:1.23-bookworm AS build
+FROM --platform=$TARGETPLATFORM golang:1.25-bookworm AS build
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -87,7 +87,7 @@ RUN set -eux; \
 		--sysctl /usr/sbin/sysctl \
 		--sysctl-source /rootfs/usr/sbin/sysctl
 
-FROM --platform=$TARGETPLATFORM golang:1.23-bookworm AS test
+FROM --platform=$TARGETPLATFORM golang:1.25-bookworm AS test
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /src
 COPY . .
