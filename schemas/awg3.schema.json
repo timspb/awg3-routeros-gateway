@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AWG3Config",
+  "type": "object",
+  "required": ["version", "interface_name", "listen_port", "mtu", "tunnel_address", "gateway", "veth_address", "allowed_ips", "endpoint", "persistent_keepalive", "header_protection_key", "content_padding_min", "content_padding_max", "j_min", "j_max", "s_min", "s_max", "h_min", "h_max", "i_min", "i_max", "health_address", "ui_mode"],
+  "properties": {
+    "version": {"type": "string"},
+    "interface_name": {"type": "string"},
+    "listen_port": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "mtu": {"type": "integer", "minimum": 576, "maximum": 9000},
+    "tunnel_address": {"type": "string"},
+    "gateway": {"type": "string"},
+    "veth_address": {"type": "string"},
+    "allowed_ips": {"type": "array", "items": {"type": "string"}},
+    "endpoint": {"type": "string"},
+    "persistent_keepalive": {"type": "integer", "minimum": 0, "maximum": 600},
+    "header_protection_key": {"type": "string"},
+    "content_padding_min": {"type": "integer", "minimum": 0, "maximum": 32},
+    "content_padding_max": {"type": "integer", "minimum": 0, "maximum": 32},
+    "j_min": {"type": "integer", "minimum": 0},
+    "j_max": {"type": "integer", "minimum": 0},
+    "s_min": {"type": "integer", "minimum": 0},
+    "s_max": {"type": "integer", "minimum": 0},
+    "h_min": {"type": "integer", "minimum": 0},
+    "h_max": {"type": "integer", "minimum": 0},
+    "i_min": {"type": "integer", "minimum": 0},
+    "i_max": {"type": "integer", "minimum": 0},
+    "health_address": {"type": "string"},
+    "ui_mode": {"enum": ["always", "on_demand"]}
+  }
+}
+

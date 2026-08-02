@@ -1,0 +1,20 @@
+{
+  "sources": [
+    {
+      "name": "amneziawg-go",
+      "repo_url": "https://github.com/amnezia-vpn/amneziawg-go.git",
+      "ref": "v3.0.3",
+      "commit": "cf9d2dd202821301f7039093b0a1b3d4b574c47c",
+      "purpose": "userspace awg3 runtime",
+      "license": "MIT"
+    },
+    {
+      "name": "amneziawg-tools",
+      "repo_url": "https://github.com/amnezia-vpn/amneziawg-tools.git",
+      "ref": "v3.0.20260730",
+      "commit": "d09ecc38425082e472368dd2bf8c4c42d10cae03",
+      "purpose": "official parser/showconf/dump tooling",
+      "license": "GPL-2.0-only"
+    }
+  ]
+}
