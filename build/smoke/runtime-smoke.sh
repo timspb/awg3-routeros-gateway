@@ -45,7 +45,7 @@ if [ -z "${child_pid}" ]; then
 	exit 1
 fi
 
-kill -TERM "${gateway_pid}"
+kill -TERM "${gateway_pid}" 2>/dev/null || true
 gateway_rc=0
 if wait "${gateway_pid}"; then
 	gateway_rc=0
