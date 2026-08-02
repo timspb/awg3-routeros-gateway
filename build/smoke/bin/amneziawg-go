@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+	echo "usage: amneziawg-go <interface>"
+	exit 0
+fi
+
+STATE_DIR="${AWG3_SMOKE_STATE_DIR:-/tmp/awg3-smoke}"
+mkdir -p "${STATE_DIR}"
+pid_file="${STATE_DIR}/amneziawg-go.pid"
+printf '%s\n' "$$" >"${pid_file}"
+
+cleanup() {
+	rm -f "${pid_file}"
+	exit 0
+}
+
+trap cleanup INT TERM HUP
+
+while :; do
+	sleep 1
+done

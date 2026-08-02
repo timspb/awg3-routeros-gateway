@@ -25,6 +25,13 @@ target "image-amd64" {
   output    = ["type=docker"]
 }
 
+target "footprint-amd64" {
+  inherits  = ["base"]
+  target    = "runtime"
+  platforms = ["linux/amd64"]
+  output    = ["type=oci,dest=build/evidence/awg3-routeros-gateway-amd64.oci.tar"]
+}
+
 target "image-arm64" {
   inherits  = ["base"]
   target    = "runtime"
@@ -51,4 +58,18 @@ target "smoke" {
   target    = "smoke"
   platforms = ["linux/amd64"]
   output    = ["type=docker"]
+}
+
+target "smoke-arm64" {
+  inherits  = ["base"]
+  target    = "smoke"
+  platforms = ["linux/arm64"]
+  output    = ["type=oci,dest=build/evidence/awg3-routeros-gateway-smoke-arm64.oci.tar"]
+}
+
+target "smoke-armv5" {
+  inherits  = ["base"]
+  target    = "smoke"
+  platforms = ["linux/arm/v5"]
+  output    = ["type=oci,dest=build/evidence/awg3-routeros-gateway-smoke-armv5.oci.tar"]
 }

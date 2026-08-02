@@ -237,7 +237,7 @@ RB5009:
 
 Deliverable checkpoint: таблица `object → current value → planned action → rollback source`.
 
-### Phase 2 — reproducible build
+### Phase 2 — repeatable build from pinned source and base images
 
 Собрать вне production runtime:
 

@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"awg3routerosgateway/internal/artifacts"
@@ -18,7 +21,12 @@ import (
 var buildCommit = "unknown"
 
 func main() {
-	if err := run(context.Background(), os.Args[1:]); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -48,7 +56,7 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	if *mode == "run" || *mode == "apply" {
+	if *mode == "run" || *mode == "apply" || *mode == "validate" {
 		executable, err := os.Executable()
 		if err != nil {
 			return err
@@ -142,7 +150,26 @@ func run(ctx context.Context, args []string) error {
 
 	switch *mode {
 	case "validate":
-		return sup.Validate(ctx)
+		if err := sup.Validate(ctx); err != nil {
+			return err
+		}
+		pair := config.Pair{}
+		switch {
+		case *candidateConfig != "" || *candidateSecrets != "":
+			if *candidateConfig == "" || *candidateSecrets == "" {
+				return fmt.Errorf("candidate-config and candidate-secrets must be set together")
+			}
+			pair, err = config.LoadPair(*candidateConfig, *candidateSecrets)
+			if err != nil {
+				return err
+			}
+		default:
+			pair, err = config.LoadPair(*configPath, *secretsPath)
+			if err != nil {
+				return err
+			}
+		}
+		return officialPreflight.Check(ctx, pair)
 	case "apply":
 		return sup.Apply(ctx)
 	case "status":

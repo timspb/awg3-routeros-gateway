@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
@@ -306,6 +307,12 @@ func TestHelperProcess(t *testing.T) {
 			}
 			_, _ = fmt.Fprint(os.Stdout, string(decoded))
 		}
+		os.Exit(0)
+	case "hold":
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh)
+		<-sigCh
+		signal.Stop(sigCh)
 		os.Exit(0)
 	default:
 		os.Exit(2)

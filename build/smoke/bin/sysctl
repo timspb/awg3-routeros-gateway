@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+--version)
+	echo "sysctl from procps-smoke"
+	exit 0
+	;;
+-n)
+	case "${2:-}" in
+	net.ipv4.ip_forward)
+		echo "1"
+		exit 0
+		;;
+	net.ipv6.conf.all.forwarding)
+		echo "1"
+		exit 0
+		;;
+	esac
+	;;
+-w)
+	echo "${2:-}"
+	exit 0
+	;;
+esac
+
+echo "unsupported sysctl invocation: $*" >&2
+exit 1

@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+	echo "usage: awg <setconf|showconf|show>"
+	exit 0
+fi
+
+STATE_DIR="${AWG3_SMOKE_STATE_DIR:-/tmp/awg3-smoke}"
+mkdir -p "${STATE_DIR}"
+setconf_file="${STATE_DIR}/setconf.conf"
+
+case "${1:-}" in
+setconf)
+	if [ $# -ne 3 ]; then
+		echo "usage: awg setconf <interface> <config>" >&2
+		exit 1
+	fi
+	cp "$3" "${setconf_file}"
+	exit 0
+	;;
+showconf)
+	if [ $# -ne 2 ]; then
+		echo "usage: awg showconf <interface>" >&2
+		exit 1
+	fi
+	if [ ! -f "${setconf_file}" ]; then
+		echo "setconf state missing" >&2
+		exit 1
+	fi
+	cat "${setconf_file}"
+	exit 0
+	;;
+show)
+	if [ $# -ne 3 ] || [ "${3:-}" != "dump" ]; then
+		echo "usage: awg show <interface> dump" >&2
+		exit 1
+	fi
+	if [ ! -f "${setconf_file}" ]; then
+		echo "setconf state missing" >&2
+		exit 1
+	fi
+	private_key="$(awk -F ' = ' '$1 == "PrivateKey" { print $2 }' "${setconf_file}" | tail -n 1)"
+	listen_port="$(awk -F ' = ' '$1 == "ListenPort" { print $2 }' "${setconf_file}" | tail -n 1)"
+	jc="$(awk -F ' = ' '$1 == "Jc" { print $2 }' "${setconf_file}" | tail -n 1)"
+	i1="$(awk -F ' = ' '$1 == "I1" { print $2 }' "${setconf_file}" | tail -n 1)"
+	i5="$(awk -F ' = ' '$1 == "I5" { print $2 }' "${setconf_file}" | tail -n 1)"
+	header_key="$(awk -F ' = ' '$1 == "HeaderProtectionKey" { print $2 }' "${setconf_file}" | tail -n 1)"
+	public_key="$(awk -F ' = ' '$1 == "PublicKey" { print $2 }' "${setconf_file}" | tail -n 1)"
+	preshared_key="$(awk -F ' = ' '$1 == "PresharedKey" { print $2 }' "${setconf_file}" | tail -n 1)"
+	endpoint="$(awk -F ' = ' '$1 == "Endpoint" { print $2 }' "${setconf_file}" | tail -n 1)"
+	allowed_ips="$(awk -F ' = ' '$1 == "AllowedIPs" { print $2 }' "${setconf_file}" | tail -n 1 | sed 's/, /,/g')"
+	printf '%s\t(none)\t%s\t%s\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t%s\t-\t-\t-\t%s\t%s\t-\t-\t-\t-\t-\t-\t-\n' \
+		"${private_key}" "${listen_port}" "${jc}" "${i1}" "${i5}" "${header_key}"
+	printf '%s\t%s\t%s\t%s\n' "${public_key}" "${preshared_key}" "${endpoint}" "${allowed_ips}"
+	exit 0
+	;;
+esac
+
+echo "unsupported awg invocation: $*" >&2
+exit 1

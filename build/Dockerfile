@@ -2,7 +2,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-FROM --platform=$BUILDPLATFORM golang:1.25.6-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db AS build
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -12,6 +12,8 @@ ARG AWG_GO_COMMIT=cf9d2dd202821301f7039093b0a1b3d4b574c47c
 ARG AWG_TOOLS_REPO=https://github.com/amnezia-vpn/amneziawg-tools.git
 ARG AWG_TOOLS_COMMIT=d09ecc38425082e472368dd2bf8c4c42d10cae03
 ENV DEBIAN_FRONTEND=noninteractive
+ENV GOTOOLCHAIN=local
+ENV GOFLAGS=-buildvcs=false
 WORKDIR /src
 COPY . .
 RUN set -eux; \
@@ -134,8 +136,10 @@ RUN set -eux; \
 		--sysctl-source /rootfs/usr/sbin/sysctl \
 		--pkg-commit "${ip_version} ${procps_version} ${binutils_version}"
 
-FROM --platform=$BUILDPLATFORM golang:1.25.6-bookworm AS test
+FROM --platform=$BUILDPLATFORM golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db AS test
 ENV DEBIAN_FRONTEND=noninteractive
+ENV GOTOOLCHAIN=local
+ENV GOFLAGS=-buildvcs=false
 WORKDIR /src
 COPY . .
 RUN set -eux; \
@@ -147,7 +151,7 @@ RUN set -eux; \
 	go test -tags integration ./...; \
 	go test -tags integration ./internal/awgofficial -run TestOfficialSetconfShowconfDumpRoundTrip -v -count=1
 
-FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS runtime
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 RUN set -eux; \
 	apt-get update; \
@@ -157,8 +161,6 @@ COPY --from=build /rootfs/gateway /gateway
 COPY --from=build /rootfs/usr/local/bin/amneziawg-go /usr/local/bin/amneziawg-go
 COPY --from=build /rootfs/usr/local/bin/awg /usr/local/bin/awg
 COPY --from=build /rootfs/usr/local/bin/awg3-parser-validate /usr/local/bin/awg3-parser-validate
-COPY --from=build /rootfs/usr/sbin/ip /usr/sbin/ip
-COPY --from=build /rootfs/usr/sbin/sysctl /usr/sbin/sysctl
 COPY --from=build /rootfs/etc/awg3/runtime-artifacts.json /etc/awg3/runtime-artifacts.json
 ENTRYPOINT ["/gateway"]
 
@@ -166,8 +168,15 @@ FROM runtime AS smoke
 COPY build/smoke/ /smoke/
 RUN set -eux; \
 	chmod 0600 /smoke/awg3.json /smoke/secrets.json; \
+	chmod 0755 /smoke/runtime-smoke.sh /smoke/bin/amneziawg-go /smoke/bin/awg /smoke/bin/ip /smoke/bin/sysctl; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends file; \
 	rm -rf /var/lib/apt/lists/*; \
 	file /gateway /usr/local/bin/amneziawg-go /usr/local/bin/awg /usr/local/bin/awg3-parser-validate /usr/sbin/ip /usr/sbin/sysctl; \
-	/gateway --mode validate --config /smoke/awg3.json --secrets /smoke/secrets.json
+	/gateway --help >/dev/null; \
+	/usr/local/bin/amneziawg-go --help >/dev/null; \
+	/usr/local/bin/awg --help >/dev/null; \
+	/usr/local/bin/awg3-parser-validate /smoke/setconf.conf; \
+	/usr/sbin/ip -Version >/dev/null; \
+	/usr/sbin/sysctl --version >/dev/null; \
+	/smoke/runtime-smoke.sh

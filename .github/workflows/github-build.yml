@@ -39,6 +39,12 @@ jobs:
       - name: Bake amd64 image
         run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-amd64 --progress=plain
 
+      - name: Bake amd64 footprint image
+        run: |
+          set -euo pipefail
+          mkdir -p build/evidence
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" footprint-amd64 --progress=plain
+
       - name: Bake arm64 image
         run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-arm64 --progress=plain
 
@@ -49,12 +55,65 @@ jobs:
         run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-multiarch --progress=plain
 
       - name: Bake smoke
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke --progress=plain
+        run: |
+          set -euo pipefail
+          mkdir -p build/evidence
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke --progress=plain 2>&1 | tee build/evidence/smoke.log
+
+      - name: Bake smoke arm64
+        run: |
+          set -euo pipefail
+          mkdir -p build/evidence
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke-arm64 --progress=plain 2>&1 | tee build/evidence/smoke-arm64.log
+
+      - name: Bake smoke armv5
+        run: |
+          set -euo pipefail
+          mkdir -p build/evidence
+          docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke-armv5 --progress=plain 2>&1 | tee build/evidence/smoke-armv5.log
+
+      - name: Build footprint report
+        run: |
+          python3 build/image-footprint.py \
+            --output build/evidence/image-footprint.json \
+            build/evidence/awg3-routeros-gateway-amd64.oci.tar \
+            build/evidence/awg3-routeros-gateway-arm64.oci.tar \
+            build/evidence/awg3-routeros-gateway-armv5.oci.tar \
+            build/evidence/awg3-routeros-gateway.oci.tar
 
       - name: Upload build evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-evidence
+          path: build/evidence
+          if-no-files-found: ignore
+
+  resource-baseline:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run resource baseline
+        run: |
+          set -euo pipefail
+          mkdir -p build/evidence
+          AWG3_RESOURCE_BASELINE_OUT=build/evidence/resource-baseline.json go test -tags integration,resourcebaseline ./internal/runtime -run TestResourceBaselineValidation -v -count=1 2>&1 | tee build/evidence/resource-baseline.log
+
+      - name: Upload resource baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resource-baseline-evidence
           path: build/evidence
           if-no-files-found: ignore

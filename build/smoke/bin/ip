@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+-Version|-V|--version)
+	echo "ip utility, iproute2-smoke"
+	exit 0
+	;;
+esac
+
+subcommand="${1:-}"
+shift || true
+
+case "${subcommand}" in
+link)
+	if [ "${1:-}" = "show" ] && [ "${2:-}" = "dev" ]; then
+		if [ "${3:-}" != "awg3" ]; then
+			echo "unknown interface ${3:-}" >&2
+			exit 1
+		fi
+		echo "2: awg3: <POINTOPOINT,UP,LOWER_UP> mtu 1380 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000"
+		exit 0
+	fi
+	if [ "${1:-}" = "set" ] && [ "${2:-}" = "dev" ]; then
+		exit 0
+	fi
+	;;
+addr)
+	if [ "${1:-}" = "show" ] && [ "${2:-}" = "dev" ]; then
+		if [ "${3:-}" != "awg3" ]; then
+			echo "unknown interface ${3:-}" >&2
+			exit 1
+		fi
+		echo "2: awg3    inet 10.99.99.2/30 scope global awg3"
+		exit 0
+	fi
+	if [ "${1:-}" = "replace" ]; then
+		exit 0
+	fi
+	;;
+route)
+	case "${1:-}" in
+	show)
+		if [ "${2:-}" = "dev" ] && [ "${3:-}" = "awg3" ]; then
+			echo "10.99.99.0/24 dev awg3 scope link"
+			exit 0
+		fi
+		;;
+	get)
+		echo "213.176.116.165 via 10.99.99.1 dev eth0 src 10.99.99.2 table main"
+		exit 0
+		;;
+	replace|del)
+		exit 0
+		;;
+	esac
+	;;
+esac
+
+echo "unsupported ip invocation: $subcommand $*" >&2
+exit 1
