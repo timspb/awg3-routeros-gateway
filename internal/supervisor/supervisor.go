@@ -568,6 +568,7 @@ func (s *Supervisor) clearSessionLocked() (*http.Server, chan struct{}) {
 	s.sessionStop = nil
 	s.candidate = nil
 	s.ui = session{}
+	s.opts.ConfigAddr = "127.0.0.1:0"
 	return srv, stop
 }
 
