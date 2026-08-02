@@ -1,0 +1,60 @@
+name: github-build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+
+      - name: Docker version
+        run: docker version
+
+      - name: Buildx version
+        run: docker buildx version
+
+      - name: Buildx inspect
+        run: docker buildx inspect --bootstrap
+
+      - name: Bake test
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." test --progress=plain
+
+      - name: Bake amd64 image
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-amd64 --progress=plain
+
+      - name: Bake arm64 image
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-arm64 --progress=plain
+
+      - name: Bake armv5 image
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-armv5 --progress=plain
+
+      - name: Bake multiarch image
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-multiarch --progress=plain
+
+      - name: Bake smoke
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." smoke --progress=plain
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-evidence
+          path: build/evidence
+          if-no-files-found: ignore
