@@ -266,7 +266,7 @@ func (s *Supervisor) CloseUI(ctx context.Context) error {
 		close(stop)
 	}
 	if srv != nil {
-		go shutdownServer(srv)
+		shutdownServer(srv)
 	}
 	return nil
 }
