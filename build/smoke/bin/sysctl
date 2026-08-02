@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+STATE_DIR="${AWG3_SMOKE_STATE_DIR:-/tmp/awg3-smoke}"
+mkdir -p "${STATE_DIR}"
+ipv4_file="${STATE_DIR}/sysctl.ipv4"
+ipv6_file="${STATE_DIR}/sysctl.ipv6"
+[ -f "${ipv4_file}" ] || printf '0\n' >"${ipv4_file}"
+[ -f "${ipv6_file}" ] || printf '0\n' >"${ipv6_file}"
+printf '%s\n' "$*" >>"${STATE_DIR}/sysctl.commands"
+
 case "${1:-}" in
 --version)
 	echo "sysctl from procps-smoke"
@@ -9,16 +17,21 @@ case "${1:-}" in
 -n)
 	case "${2:-}" in
 	net.ipv4.ip_forward)
-		echo "1"
+		cat "${ipv4_file}"
 		exit 0
 		;;
 	net.ipv6.conf.all.forwarding)
-		echo "1"
+		cat "${ipv6_file}"
 		exit 0
 		;;
 	esac
 	;;
 -w)
+	case "${2:-}" in
+	net.ipv4.ip_forward=*) printf '%s\n' "${2#*=}" >"${ipv4_file}" ;;
+	net.ipv6.conf.all.forwarding=*) printf '%s\n' "${2#*=}" >"${ipv6_file}" ;;
+	*) echo "unsupported sysctl assignment: ${2:-}" >&2; exit 1 ;;
+	esac
 	echo "${2:-}"
 	exit 0
 	;;

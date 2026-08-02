@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+STATE_DIR="${AWG3_SMOKE_STATE_DIR:-/tmp/awg3-smoke}"
+mkdir -p "${STATE_DIR}"
+printf '%s\n' "$*" >>"${STATE_DIR}/ip.commands"
+
 case "${1:-}" in
 -Version|-V|--version)
 	echo "ip utility, iproute2-smoke"
@@ -14,7 +18,7 @@ shift || true
 case "${subcommand}" in
 link)
 	if [ "${1:-}" = "show" ] && [ "${2:-}" = "dev" ]; then
-		if [ "${3:-}" != "awg3" ]; then
+		if [ "${3:-}" != "awg3" ] || [ ! -f "${STATE_DIR}/interface.state" ]; then
 			echo "unknown interface ${3:-}" >&2
 			exit 1
 		fi
@@ -35,6 +39,7 @@ addr)
 		exit 0
 	fi
 	if [ "${1:-}" = "replace" ]; then
+		printf '%s\n' "$*" >"${STATE_DIR}/address.state"
 		exit 0
 	fi
 	;;
@@ -51,6 +56,14 @@ route)
 		exit 0
 		;;
 	replace|del)
+		if [ "${1:-}" = "replace" ]; then
+			case " $* " in
+			*" via "*) printf '%s\n' "$*" >"${STATE_DIR}/endpoint-route.state" ;;
+			*) printf '%s\n' "$*" >>"${STATE_DIR}/tunnel-routes.state" ;;
+			esac
+		else
+			rm -f "${STATE_DIR}/endpoint-route.state"
+		fi
 		exit 0
 		;;
 	esac

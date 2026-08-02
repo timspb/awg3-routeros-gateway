@@ -225,31 +225,34 @@ func (c *Controller) Stop(ctx context.Context) error {
 		return nil
 	}
 	c.current.stopping = true
-	err := c.stopProcess(ctx, c.current.process)
-	if err != nil {
+	stopErr := c.stopProcess(ctx, c.current.process)
+	var cleanupErr error
+	if cleaner, ok := c.network.(interface {
+		Cleanup(context.Context, config.Pair) error
+	}); ok {
+		cleanupErr = cleaner.Cleanup(ctx, c.current.pair)
+	}
+	combinedErr := errors.Join(stopErr, cleanupErr)
+	if stopErr != nil {
 		c.status.Running = true
 		c.status.Ready = false
 		c.status.Degraded = true
 		c.status.DegradedReason = "previous_stop_failed"
 		c.status.ContendedPID = c.current.process.PID()
 		c.status.ContendedGeneration = c.current.pair.Config.Generation
-		c.status.LastError = err.Error()
-		return err
+		c.status.LastError = combinedErr.Error()
+		return combinedErr
 	}
-	if cleaner, ok := c.network.(interface {
-		Cleanup(context.Context, config.Pair) error
-	}); ok {
-		if cleanupErr := cleaner.Cleanup(ctx, c.current.pair); cleanupErr != nil {
-			c.status.Running = false
-			c.status.Ready = false
-			c.status.Degraded = true
-			c.status.DegradedReason = "endpoint_cleanup_failed"
-			c.status.ContendedPID = c.current.process.PID()
-			c.status.ContendedGeneration = c.current.pair.Config.Generation
-			c.status.LastError = cleanupErr.Error()
-			c.current = nil
-			return cleanupErr
-		}
+	if cleanupErr != nil {
+		c.status.Running = false
+		c.status.Ready = false
+		c.status.Degraded = true
+		c.status.DegradedReason = "network_cleanup_failed"
+		c.status.ContendedPID = c.current.process.PID()
+		c.status.ContendedGeneration = c.current.pair.Config.Generation
+		c.status.LastError = cleanupErr.Error()
+		c.current = nil
+		return cleanupErr
 	}
 	c.current = nil
 	c.status.Running = false
@@ -261,16 +264,16 @@ func (c *Controller) Stop(ctx context.Context) error {
 	c.status.StoppedAt = time.Now().UTC()
 	c.restartWindowStart = time.Time{}
 	c.status.RestartCount = 0
-	return err
+	return nil
 }
 
 func (c *Controller) Shutdown(ctx context.Context) error {
 	c.mu.Lock()
 	current := c.current
-	degraded := c.status.Degraded
 	c.mu.Unlock()
-	if current != nil && !degraded {
-		_ = c.Stop(ctx)
+	var stopErr error
+	if current != nil {
+		stopErr = c.Stop(ctx)
 	}
 	c.lifecycleCancel()
 	done := make(chan struct{})
@@ -280,7 +283,7 @@ func (c *Controller) Shutdown(ctx context.Context) error {
 	}()
 	select {
 	case <-done:
-		return nil
+		return stopErr
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -305,9 +308,25 @@ func (c *Controller) startLocked(ctx context.Context, pair config.Pair) error {
 		return err
 	}
 	if err := c.applyNetwork(ctx, pair, proc, false); err != nil {
-		_ = c.stopProcess(ctx, proc)
-		c.status.LastError = err.Error()
-		return err
+		stopErr := c.stopProcess(ctx, proc)
+		var cleanupErr error
+		if cleaner, ok := c.network.(interface {
+			Cleanup(context.Context, config.Pair) error
+		}); ok {
+			cleanupErr = cleaner.Cleanup(ctx, pair)
+		}
+		combinedErr := errors.Join(err, stopErr, cleanupErr)
+		c.status.LastError = combinedErr.Error()
+		if stopErr != nil {
+			c.status.Degraded = true
+			c.status.DegradedReason = "candidate_stop_failed"
+			c.status.ContendedPID = proc.PID()
+			c.status.ContendedGeneration = pair.Config.Generation
+		} else if cleanupErr != nil {
+			c.status.Degraded = true
+			c.status.DegradedReason = "endpoint_cleanup_failed"
+		}
+		return combinedErr
 	}
 	c.current = &state{pair: pair, process: proc}
 	c.status = Status{

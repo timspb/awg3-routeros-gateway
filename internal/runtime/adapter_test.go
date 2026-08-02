@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -78,6 +79,34 @@ func TestExecAdapterUsesCanonicalInterfaceName(t *testing.T) {
 		if err := handle.Wait(context.Background()); err != nil {
 			t.Fatalf("wait failed: %v", err)
 		}
+	}
+}
+
+func TestExecAdapterChildLifetimeIsNotBoundToStartContext(t *testing.T) {
+	adapter, err := NewExecAdapter(ExecOptions{
+		Binary:         "ignored",
+		CommandFactory: holdCommandFactory{},
+		StopTimeout:    time.Second,
+		KillTimeout:    time.Second,
+	})
+	if err != nil {
+		t.Fatalf("new exec adapter failed: %v", err)
+	}
+	startCtx, cancelStart := context.WithCancel(context.Background())
+	proc, err := adapter.Start(startCtx, pairForRuntime("gen-lifetime"))
+	if err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	handle := proc.(ProcessHandle)
+	cancelStart()
+
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancelWait()
+	if err := handle.Wait(waitCtx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("child exited with start context: %v", err)
+	}
+	if err := adapter.Stop(context.Background(), handle); err != nil {
+		t.Fatalf("controlled stop failed: %v", err)
 	}
 }
 
@@ -158,6 +187,57 @@ func TestExecAdapterApplyReadyAndRestoreUseOfficialTooling(t *testing.T) {
 	}
 }
 
+func TestExecAdapterCleanupRestoresForwardingAndEndpointRoute(t *testing.T) {
+	pair := pairForRuntime("gen-cleanup")
+	factory := &scriptedCommandFactory{
+		pair: pair,
+		sysctlValues: map[string]string{
+			"net.ipv4.ip_forward":          "0",
+			"net.ipv6.conf.all.forwarding": "0",
+		},
+	}
+	exclusion := NewRouteEndpointExclusionAdapter()
+	exclusion.CommandFactory = factory
+	adapter, err := NewExecAdapter(ExecOptions{
+		Binary:            "ignored",
+		ToolsBinary:       "awg",
+		IPBinary:          "ip",
+		SysctlBinary:      "sysctl",
+		CommandFactory:    factory,
+		Preflight:         NewCanonicalProfilePreflightAdapter(),
+		EndpointExclusion: exclusion,
+	})
+	if err != nil {
+		t.Fatalf("new exec adapter failed: %v", err)
+	}
+	if err := adapter.Apply(context.Background(), pair); err != nil {
+		t.Fatalf("apply failed: %v", err)
+	}
+	if got := factory.sysctlValues["net.ipv4.ip_forward"]; got != "1" {
+		t.Fatalf("ipv4 forwarding after apply = %q, want 1", got)
+	}
+	if err := adapter.Cleanup(context.Background(), pair); err != nil {
+		t.Fatalf("cleanup failed: %v", err)
+	}
+	if got := factory.sysctlValues["net.ipv4.ip_forward"]; got != "0" {
+		t.Fatalf("ipv4 forwarding after cleanup = %q, want 0", got)
+	}
+	if got := factory.sysctlValues["net.ipv6.conf.all.forwarding"]; got != "0" {
+		t.Fatalf("ipv6 forwarding after cleanup = %q, want 0", got)
+	}
+	gotCalls := strings.Join(factory.calls, "\n")
+	if !strings.Contains(gotCalls, "ip route del 213.176.116.165/32 table main") {
+		t.Fatalf("endpoint route was not removed:\n%s", gotCalls)
+	}
+	beforeRepeatedCleanup := len(factory.calls)
+	if err := adapter.Cleanup(context.Background(), pair); err != nil {
+		t.Fatalf("repeated cleanup failed: %v", err)
+	}
+	if len(factory.calls) != beforeRepeatedCleanup {
+		t.Fatalf("repeated cleanup performed commands: %v", factory.calls[beforeRepeatedCleanup:])
+	}
+}
+
 func TestOfficialParserPreflightCheckCleansUpTempFileAndUses0600(t *testing.T) {
 	factory := &validatorCaptureFactory{}
 	adapter, err := NewOfficialParserPreflightAdapter(OfficialParserPreflightOptions{
@@ -223,6 +303,12 @@ type captureCommandFactory struct {
 	args []string
 }
 
+type holdCommandFactory struct{}
+
+func (holdCommandFactory) CommandContext(ctx context.Context, _ string, _ ...string) *exec.Cmd {
+	return helperCommand(ctx, "hold", "")
+}
+
 func (f *captureCommandFactory) CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd {
 	f.name = name
 	f.args = append([]string{}, args...)
@@ -230,8 +316,9 @@ func (f *captureCommandFactory) CommandContext(ctx context.Context, name string,
 }
 
 type scriptedCommandFactory struct {
-	pair  config.Pair
-	calls []string
+	pair         config.Pair
+	calls        []string
+	sysctlValues map[string]string
 }
 
 type validatorCaptureFactory struct {
@@ -259,8 +346,17 @@ func (f *scriptedCommandFactory) CommandContext(ctx context.Context, name string
 	case name == "ip" && len(args) >= 2 && args[0] == "route" && (args[1] == "replace" || args[1] == "del"):
 		return helperCommand(ctx, "exit0", "")
 	case name == "sysctl" && len(args) >= 2 && args[0] == "-n":
+		if f.sysctlValues != nil {
+			return helperCommand(ctx, "echo", f.sysctlValues[args[1]])
+		}
 		return helperCommand(ctx, "echo", "1")
 	case name == "sysctl" && len(args) >= 2 && args[0] == "-w":
+		if f.sysctlValues != nil {
+			parts := strings.SplitN(args[1], "=", 2)
+			if len(parts) == 2 {
+				f.sysctlValues[parts[0]] = parts[1]
+			}
+		}
 		return helperCommand(ctx, "exit0", "")
 	case name == "awg" && len(args) >= 1 && args[0] == "setconf":
 		return helperCommand(ctx, "exit0", "")

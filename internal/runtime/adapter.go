@@ -98,6 +98,10 @@ type ExecOptions struct {
 
 type ExecAdapter struct {
 	opts ExecOptions
+
+	stateMu            sync.Mutex
+	forwardingBaseline map[string]string
+	forwardingChanged  map[string]bool
 }
 
 func NewExecAdapter(opts ExecOptions) (*ExecAdapter, error) {
@@ -168,7 +172,10 @@ func (a *ExecAdapter) Start(ctx context.Context, pair config.Pair) (Process, err
 	}
 	args := append([]string{}, a.opts.Args...)
 	args = append(args, interfaceName)
-	cmd := a.opts.CommandFactory.CommandContext(ctx, a.opts.Binary, args...)
+	// The controller owns the child lifetime. Request or signal-context
+	// cancellation must not let os/exec kill the child before controlled Stop
+	// has completed network cleanup.
+	cmd := a.opts.CommandFactory.CommandContext(context.WithoutCancel(ctx), a.opts.Binary, args...)
 	secretValues := []string{
 		pair.Secrets.PrivateKey,
 		pair.Secrets.PeerPublicKey,
@@ -245,6 +252,46 @@ func (a *ExecAdapter) Ready(ctx context.Context, pair config.Pair, proc ProcessH
 
 func (a *ExecAdapter) Restore(ctx context.Context, pair config.Pair) error {
 	return a.configureRuntime(ctx, pair, true)
+}
+
+func (a *ExecAdapter) Cleanup(ctx context.Context, pair config.Pair) error {
+	var cleanupErr error
+	if cleaner, ok := a.opts.EndpointExclusion.(interface {
+		Cleanup(context.Context, config.Pair) error
+	}); ok {
+		if err := cleaner.Cleanup(ctx, pair); err != nil {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+	}
+
+	a.stateMu.Lock()
+	baseline := make(map[string]string, len(a.forwardingBaseline))
+	changed := make(map[string]bool, len(a.forwardingChanged))
+	for key, value := range a.forwardingBaseline {
+		baseline[key] = value
+	}
+	for key, value := range a.forwardingChanged {
+		changed[key] = value
+	}
+	a.stateMu.Unlock()
+
+	for _, key := range []string{"net.ipv4.ip_forward", "net.ipv6.conf.all.forwarding"} {
+		if !changed[key] {
+			continue
+		}
+		if err := a.runTool(ctx, a.opts.SysctlBinary, a.opts.ForwardingTimeout, "-w", key+"="+baseline[key]); err != nil {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+	}
+	if cleanupErr != nil {
+		return cleanupErr
+	}
+
+	a.stateMu.Lock()
+	a.forwardingBaseline = nil
+	a.forwardingChanged = nil
+	a.stateMu.Unlock()
+	return nil
 }
 
 type osCommandFactory struct{}
@@ -356,6 +403,9 @@ func (a *ExecAdapter) configureRuntime(ctx context.Context, pair config.Pair, re
 		return err
 	}
 	if err := a.runTool(ctx, a.opts.ToolsBinary, a.opts.SetconfTimeout, "setconf", pair.Config.InterfaceName, tmpPath); err != nil {
+		return err
+	}
+	if err := a.captureForwardingBaseline(ctx); err != nil {
 		return err
 	}
 	if err := a.applyInterfaceConfig(ctx, pair); err != nil {
@@ -503,7 +553,51 @@ func (a *ExecAdapter) applyInterfaceConfig(ctx context.Context, pair config.Pair
 	if err := a.runTool(ctx, a.opts.SysctlBinary, a.opts.ForwardingTimeout, "-w", "net.ipv4.ip_forward=1"); err != nil {
 		return err
 	}
-	return a.runTool(ctx, a.opts.SysctlBinary, a.opts.ForwardingTimeout, "-w", "net.ipv6.conf.all.forwarding=1")
+	a.markForwardingChanged("net.ipv4.ip_forward")
+	if err := a.runTool(ctx, a.opts.SysctlBinary, a.opts.ForwardingTimeout, "-w", "net.ipv6.conf.all.forwarding=1"); err != nil {
+		return err
+	}
+	a.markForwardingChanged("net.ipv6.conf.all.forwarding")
+	return nil
+}
+
+func (a *ExecAdapter) captureForwardingBaseline(ctx context.Context) error {
+	a.stateMu.Lock()
+	if a.forwardingBaseline != nil {
+		a.stateMu.Unlock()
+		return nil
+	}
+	a.stateMu.Unlock()
+
+	baseline := make(map[string]string, 2)
+	for _, key := range []string{"net.ipv4.ip_forward", "net.ipv6.conf.all.forwarding"} {
+		out, err := a.commandOutput(ctx, a.opts.SysctlBinary, a.opts.ForwardingTimeout, "-n", key)
+		if err != nil {
+			return err
+		}
+		value := strings.TrimSpace(out)
+		if value != "0" && value != "1" {
+			return fmt.Errorf("invalid forwarding baseline for %s", key)
+		}
+		baseline[key] = value
+	}
+
+	a.stateMu.Lock()
+	if a.forwardingBaseline == nil {
+		a.forwardingBaseline = baseline
+		a.forwardingChanged = make(map[string]bool, 2)
+	}
+	a.stateMu.Unlock()
+	return nil
+}
+
+func (a *ExecAdapter) markForwardingChanged(key string) {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	if a.forwardingChanged == nil {
+		a.forwardingChanged = make(map[string]bool, 2)
+	}
+	a.forwardingChanged[key] = true
 }
 
 func (a *ExecAdapter) verifyAddress(ctx context.Context, pair config.Pair) error {

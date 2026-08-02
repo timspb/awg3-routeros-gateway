@@ -468,6 +468,60 @@ func TestControllerRepeatedShutdownIsSafe(t *testing.T) {
 	}
 }
 
+func TestControllerStopJoinsStopAndCleanupErrors(t *testing.T) {
+	stopFailure := errors.New("stop failed")
+	cleanupFailure := errors.New("cleanup failed")
+	network := &shutdownCleanupNetwork{cleanupErr: cleanupFailure}
+	ctrl, err := New(func(context.Context, config.Pair) (Process, error) {
+		return &shutdownProcess{done: make(chan struct{}), pid: 5357}, nil
+	}, nil, network, func(_ context.Context, proc Process) error {
+		_ = proc.Kill()
+		return stopFailure
+	})
+	if err != nil {
+		t.Fatalf("new controller failed: %v", err)
+	}
+	if err := ctrl.Start(context.Background(), pairForRuntime("gen-stop-cleanup-errors")); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	err = ctrl.Stop(context.Background())
+	if !errors.Is(err, stopFailure) || !errors.Is(err, cleanupFailure) {
+		t.Fatalf("stop error does not preserve both failures: %v", err)
+	}
+	if network.cleanupCount != 1 {
+		t.Fatalf("cleanup count = %d, want 1", network.cleanupCount)
+	}
+	status := ctrl.Status()
+	if !status.Degraded || status.DegradedReason != "previous_stop_failed" || status.Ready {
+		t.Fatalf("unexpected degraded status: %#v", status)
+	}
+}
+
+func TestControllerInitialReadinessFailureJoinsStopAndCleanupErrors(t *testing.T) {
+	readinessFailure := errors.New("readiness failed")
+	stopFailure := errors.New("stop failed")
+	cleanupFailure := errors.New("cleanup failed")
+	network := &shutdownCleanupNetwork{readyErr: readinessFailure, cleanupErr: cleanupFailure}
+	ctrl, err := New(func(context.Context, config.Pair) (Process, error) {
+		return &shutdownProcess{done: make(chan struct{}), pid: 5358}, nil
+	}, nil, network, func(_ context.Context, proc Process) error {
+		_ = proc.Kill()
+		return stopFailure
+	})
+	if err != nil {
+		t.Fatalf("new controller failed: %v", err)
+	}
+	err = ctrl.Start(context.Background(), pairForRuntime("gen-partial-cleanup-errors"))
+	for _, want := range []error{readinessFailure, stopFailure, cleanupFailure} {
+		if !errors.Is(err, want) {
+			t.Fatalf("start error does not preserve %v: %v", want, err)
+		}
+	}
+	if network.cleanupCount != 1 {
+		t.Fatalf("cleanup count = %d, want 1", network.cleanupCount)
+	}
+}
+
 func TestExecProcessWaitBroadcastsResult(t *testing.T) {
 	cmd := helperCommand(context.Background(), "exit0", "")
 	if err := cmd.Start(); err != nil {
@@ -642,17 +696,21 @@ func (p *shutdownProcess) Wait(context.Context) error {
 
 type shutdownCleanupNetwork struct {
 	cleanupCount int
+	readyErr     error
+	cleanupErr   error
 }
 
 func (n *shutdownCleanupNetwork) Apply(context.Context, config.Pair) error { return nil }
 
-func (n *shutdownCleanupNetwork) Ready(context.Context, config.Pair, ProcessHandle) error { return nil }
+func (n *shutdownCleanupNetwork) Ready(context.Context, config.Pair, ProcessHandle) error {
+	return n.readyErr
+}
 
 func (n *shutdownCleanupNetwork) Restore(context.Context, config.Pair) error { return nil }
 
 func (n *shutdownCleanupNetwork) Cleanup(context.Context, config.Pair) error {
 	n.cleanupCount++
-	return nil
+	return n.cleanupErr
 }
 
 type failingNetwork struct {

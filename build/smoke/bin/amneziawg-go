@@ -9,10 +9,14 @@ fi
 STATE_DIR="${AWG3_SMOKE_STATE_DIR:-/tmp/awg3-smoke}"
 mkdir -p "${STATE_DIR}"
 pid_file="${STATE_DIR}/amneziawg-go.pid"
+interface_file="${STATE_DIR}/interface.state"
+exit_file="${STATE_DIR}/amneziawg-go.exit"
+printf '%s\n' "${1:-}" >"${interface_file}"
 printf '%s\n' "$$" >"${pid_file}"
 
 cleanup() {
-	rm -f "${pid_file}"
+	printf 'signal=TERM status=0\n' >"${exit_file}"
+	rm -f "${pid_file}" "${interface_file}" "${STATE_DIR}/address.state" "${STATE_DIR}/tunnel-routes.state"
 	exit 0
 }
 
