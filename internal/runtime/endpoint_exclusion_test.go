@@ -122,7 +122,7 @@ func (f *routeCommandFactory) CommandContext(ctx context.Context, name string, a
 	switch {
 	case name == "ip" && len(args) >= 2 && args[0] == "route" && args[1] == "get":
 		if f.routeGetErr != nil {
-			return exec.CommandContext(ctx, "cmd", "/c", "exit", "1")
+			return helperCommand(ctx, "exit1", "")
 		}
 		endpoint := ""
 		if len(args) >= 3 {
@@ -131,11 +131,11 @@ func (f *routeCommandFactory) CommandContext(ctx context.Context, name string, a
 		if out, ok := f.routeGetOutputs[endpoint]; ok {
 			return helperCommand(ctx, "echo", out)
 		}
-		return exec.CommandContext(ctx, "cmd", "/c", "exit", "1")
+		return helperCommand(ctx, "exit1", "")
 	case name == "ip" && len(args) >= 2 && args[0] == "route" && (args[1] == "replace" || args[1] == "del"):
-		return exec.CommandContext(ctx, "cmd", "/c", "exit", "0")
+		return helperCommand(ctx, "exit0", "")
 	default:
-		return exec.CommandContext(ctx, "cmd", "/c", "exit", "0")
+		return helperCommand(ctx, "exit0", "")
 	}
 }
 

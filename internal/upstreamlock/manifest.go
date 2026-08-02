@@ -18,6 +18,7 @@ type Source struct {
 	Ref     string `json:"ref"`
 	Commit  string `json:"commit"`
 	Purpose string `json:"purpose"`
+	License string `json:"license"`
 }
 
 func Load(path string) (Manifest, error) {
