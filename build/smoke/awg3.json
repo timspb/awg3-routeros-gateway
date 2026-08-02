@@ -40,5 +40,17 @@
   "persistent_keepalive_min": 23,
   "persistent_keepalive_max": 27,
   "health_address": "127.0.0.1:8080",
-  "ui_mode": "on_demand"
+  "ui_mode": "on_demand",
+  "outer_path": {
+    "endpoint_exclusion": {
+      "owner": "container",
+      "routing_table": "main",
+      "outer_gateway": "10.99.99.1",
+      "outer_egress_interface": "eth0",
+      "source_address": "10.99.99.2",
+      "endpoint_resolution_policy": "literal",
+      "dynamic_renewal": true,
+      "refresh_owner": "container"
+    }
+  }
 }
