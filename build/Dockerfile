@@ -2,7 +2,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-FROM --platform=$TARGETPLATFORM golang:1.23-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.25.6-bookworm AS build
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -12,14 +12,36 @@ ARG AWG_GO_COMMIT=cf9d2dd202821301f7039093b0a1b3d4b574c47c
 ARG AWG_TOOLS_REPO=https://github.com/amnezia-vpn/amneziawg-tools.git
 ARG AWG_TOOLS_COMMIT=d09ecc38425082e472368dd2bf8c4c42d10cae03
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GOTOOLCHAIN=auto
 WORKDIR /src
 COPY . .
 RUN set -eux; \
 	apt-get update; \
-	apt-get install -y --no-install-recommends ca-certificates git build-essential gcc make pkg-config iproute2 procps file binutils; \
-	rm -rf /var/lib/apt/lists/*
-RUN set -eux; \
+	apt-get install -y --no-install-recommends ca-certificates git build-essential gcc make pkg-config file binutils; \
+	target_pkg_arch=amd64; \
+	goarch=amd64; \
+	goarm=; \
+	cc=gcc; \
+	case "${TARGETARCH}/${TARGETVARIANT}" in \
+		amd64/|amd64) ;; \
+		arm64/|arm64|arm64/v8) \
+			target_pkg_arch=arm64; \
+			goarch=arm64; \
+			cc=aarch64-linux-gnu-gcc; \
+			dpkg --add-architecture arm64; \
+			apt-get update; \
+			apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu; \
+			;; \
+		arm/v5) \
+			target_pkg_arch=armel; \
+			goarch=arm; \
+			goarm=5; \
+			cc=arm-linux-gnueabi-gcc; \
+			dpkg --add-architecture armel; \
+			apt-get update; \
+			apt-get install -y --no-install-recommends gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi; \
+			;; \
+		*) echo "unsupported target platform ${TARGETOS}/${TARGETARCH}/${TARGETVARIANT}" >&2; exit 1;; \
+	esac; \
 	test -n "${GATEWAY_SOURCE_COMMIT}"; \
 	git clone --quiet "${AWG_GO_REPO}" /tmp/amneziawg-go; \
 	git -C /tmp/amneziawg-go checkout --quiet "${AWG_GO_COMMIT}"; \
@@ -32,19 +54,39 @@ RUN set -eux; \
 	test -z "$(git -C /tmp/amneziawg-tools status --porcelain)"; \
 	test "$(git -C /tmp/amneziawg-tools remote get-url origin)" = "${AWG_TOOLS_REPO}"; \
 	mkdir -p /rootfs/etc/awg3 /rootfs/usr/local/bin /rootfs/usr/sbin; \
-	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.buildCommit=${GATEWAY_SOURCE_COMMIT}" -o /rootfs/gateway ./cmd/gateway; \
-	( cd /tmp/amneziawg-go && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /rootfs/usr/local/bin/amneziawg-go . ); \
-	make -C /tmp/amneziawg-tools/src clean wg; \
+	if [ -n "${goarm}" ]; then \
+		GOOS=linux GOARCH="${goarch}" GOARM="${goarm}" CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.buildCommit=${GATEWAY_SOURCE_COMMIT}" -o /rootfs/gateway ./cmd/gateway; \
+		( cd /tmp/amneziawg-go && GOOS=linux GOARCH="${goarch}" GOARM="${goarm}" CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /rootfs/usr/local/bin/amneziawg-go . ); \
+	else \
+		GOOS=linux GOARCH="${goarch}" CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.buildCommit=${GATEWAY_SOURCE_COMMIT}" -o /rootfs/gateway ./cmd/gateway; \
+		( cd /tmp/amneziawg-go && GOOS=linux GOARCH="${goarch}" CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /rootfs/usr/local/bin/amneziawg-go . ); \
+	fi; \
+	make -C /tmp/amneziawg-tools/src clean wg CC="${cc}"; \
 	install -D -m 0755 /tmp/amneziawg-tools/src/wg /rootfs/usr/local/bin/awg; \
-	gcc -O2 -Wall -Wextra -std=gnu11 -D_GNU_SOURCE -I /tmp/amneziawg-tools/src \
+	"${cc}" -O2 -Wall -Wextra -std=gnu11 -D_GNU_SOURCE -I /tmp/amneziawg-tools/src \
 		-o /rootfs/usr/local/bin/awg3-parser-validate \
 		/src/build/official_parser_validator.c \
 		/tmp/amneziawg-tools/src/config.c \
 		/tmp/amneziawg-tools/src/encoding.c \
 		/tmp/amneziawg-tools/src/curve25519.c \
 		/tmp/amneziawg-tools/src/type.c; \
-	install -D -m 0755 /usr/sbin/ip /rootfs/usr/sbin/ip; \
-	install -D -m 0755 /usr/sbin/sysctl /rootfs/usr/sbin/sysctl; \
+	if [ "${target_pkg_arch}" = "amd64" ]; then \
+		install -D -m 0755 /usr/sbin/ip /rootfs/usr/sbin/ip; \
+		install -D -m 0755 /usr/sbin/sysctl /rootfs/usr/sbin/sysctl; \
+		ip_version="$(dpkg-query -W -f='${Version}' iproute2)"; \
+		procps_version="$(dpkg-query -W -f='${Version}' procps)"; \
+	else \
+		apt-get download "iproute2:${target_pkg_arch}" "procps:${target_pkg_arch}"; \
+		ip_deb="$(ls iproute2_*_${target_pkg_arch}.deb)"; \
+		procps_deb="$(ls procps_*_${target_pkg_arch}.deb)"; \
+		dpkg-deb -x "${ip_deb}" /tmp/pkgroot-ip; \
+		dpkg-deb -x "${procps_deb}" /tmp/pkgroot-procps; \
+		install -D -m 0755 /tmp/pkgroot-ip/usr/sbin/ip /rootfs/usr/sbin/ip; \
+		install -D -m 0755 /tmp/pkgroot-procps/usr/sbin/sysctl /rootfs/usr/sbin/sysctl; \
+		ip_version="$(apt-cache madison "iproute2:${target_pkg_arch}" | head -n 1 | awk '{print $3}')"; \
+		procps_version="$(apt-cache madison "procps:${target_pkg_arch}" | head -n 1 | awk '{print $3}')"; \
+	fi; \
+	binutils_version="$(dpkg-query -W -f='${Version}' binutils)"; \
 	case "${TARGETARCH}/${TARGETVARIANT}" in \
 		amd64/|amd64) expected_class="ELF64"; expected_machine="Advanced Micro Devices X86-64"; expected_flags="";; \
 		arm64/|arm64|arm64/v8) expected_class="ELF64"; expected_machine="AArch64"; expected_flags="";; \
@@ -58,7 +100,7 @@ RUN set -eux; \
 		grep -q "Machine:[[:space:]]*${expected_machine}" "/tmp/$(basename "$bin").readelf"; \
 		if [ -n "${expected_flags}" ]; then grep -q "Flags:.*${expected_flags}" "/tmp/$(basename "$bin").readelf"; fi; \
 	done; \
-	toolchain_digest="$( (go version; gcc --version | head -n 1; make --version | head -n 1; git --version; dpkg-query -W -f='${Package}=${Version}\n' iproute2 procps binutils) | sha256sum | awk '{print $1}' )"; \
+	toolchain_digest="$( (go version; "${cc}" --version | head -n 1; make --version | head -n 1; git --version; dpkg-query -W -f='${Package}=${Version}\n' binutils) | sha256sum | awk '{print $1}' )"; \
 	build_recipe_digest="$(sha256sum /src/build/Dockerfile /src/build/bake.hcl /src/build/official_parser_validator.c /src/build/verify-buildx.ps1 /src/cmd/artifactgen/main.go /src/internal/artifacts/manifest.go /src/internal/artifacts/verify.go | sha256sum | awk '{print $1}' )"; \
 	go run ./cmd/artifactgen \
 		--output /rootfs/etc/awg3/runtime-artifacts.json \
@@ -72,7 +114,6 @@ RUN set -eux; \
 		--tools-repo "${AWG_TOOLS_REPO}" \
 		--tools-commit "${AWG_TOOLS_COMMIT}" \
 		--pkg-repo "debian:bookworm-slim" \
-		--pkg-commit "$(dpkg-query -W -f='${Version}' iproute2) $(dpkg-query -W -f='${Version}' procps) $(dpkg-query -W -f='${Version}' binutils)" \
 		--build-recipe "${build_recipe_digest}" \
 		--toolchain-digest "${toolchain_digest}" \
 		--gateway /gateway \
@@ -86,9 +127,10 @@ RUN set -eux; \
 		--ip /usr/sbin/ip \
 		--ip-source /rootfs/usr/sbin/ip \
 		--sysctl /usr/sbin/sysctl \
-		--sysctl-source /rootfs/usr/sbin/sysctl
+		--sysctl-source /rootfs/usr/sbin/sysctl \
+		--pkg-commit "${ip_version} ${procps_version} ${binutils_version}"
 
-FROM --platform=$TARGETPLATFORM golang:1.23-bookworm AS test
+FROM --platform=$BUILDPLATFORM golang:1.25.6-bookworm AS test
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /src
 COPY . .
