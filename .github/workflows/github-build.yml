@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      GATEWAY_SOURCE_COMMIT: ${{ github.sha }}
 
     steps:
       - name: Checkout
@@ -32,22 +34,22 @@ jobs:
         run: docker buildx inspect --bootstrap
 
       - name: Bake test
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." test --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" test --progress=plain
 
       - name: Bake amd64 image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-amd64 --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-amd64 --progress=plain
 
       - name: Bake arm64 image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-arm64 --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-arm64 --progress=plain
 
       - name: Bake armv5 image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-armv5 --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-armv5 --progress=plain
 
       - name: Bake multiarch image
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." image-multiarch --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" image-multiarch --progress=plain
 
       - name: Bake smoke
-        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." smoke --progress=plain
+        run: docker buildx bake --allow=fs.read=. -f build/bake.hcl --set "*.context=." --set "base.args.GATEWAY_SOURCE_COMMIT=$GATEWAY_SOURCE_COMMIT" smoke --progress=plain
 
       - name: Upload build evidence
         if: always()
