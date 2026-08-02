@@ -16,7 +16,7 @@ WORKDIR /src
 COPY . .
 RUN set -eux; \
 	apt-get update; \
-	apt-get install -y --no-install-recommends ca-certificates git build-essential gcc make pkg-config file binutils; \
+	apt-get install -y --no-install-recommends ca-certificates git build-essential gcc make pkg-config file binutils iproute2 procps; \
 	target_pkg_arch=amd64; \
 	goarch=amd64; \
 	goarm=; \
