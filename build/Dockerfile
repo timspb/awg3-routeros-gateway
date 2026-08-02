@@ -2,7 +2,7 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-FROM --platform=$BUILDPLATFORM golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db AS build
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58 AS build
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -136,7 +136,7 @@ RUN set -eux; \
 		--sysctl-source /rootfs/usr/sbin/sysctl \
 		--pkg-commit "${ip_version} ${procps_version} ${binutils_version}"
 
-FROM --platform=$BUILDPLATFORM golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db AS test
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm@sha256:ea341baa9bd5ba6784f6d7161ace70544349a6242d54d34a0fbfd2c4d51c9d58 AS test
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GOTOOLCHAIN=local
 ENV GOFLAGS=-buildvcs=false
