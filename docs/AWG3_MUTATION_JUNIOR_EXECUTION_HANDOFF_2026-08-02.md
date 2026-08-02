@@ -58,7 +58,7 @@ ARMv5 steady state имеет отдельный resource constraint, но не 
 Исполнитель не имеет права:
 
 - менять KVN, TEKO, VLESS/Xray, FBSH, China, AGH, TeleMT, failover selector или другие nodes;
-- включать hAP ac² в production production-edge routing/migration; на нём разрешён только isolated product acceptance;
+- включать hAP ac² в production-edge routing/migration; на нём разрешён только isolated product acceptance;
 - собирать ARM32 как generic `linux/arm` без `GOARM=5` и OCI variant `v5`;
 - добавлять на ARMv5 Python, Node.js, nginx, systemd, database, отдельный UI daemon или тяжёлый framework;
 - хранить secrets в image/App manifest/installer/env report либо логировать request bodies;
@@ -319,7 +319,7 @@ hAP ac² ARMv5:
 
 - только ordinary `/container`; `/app` не использовать;
 - подтвердить actual CPU/ABI execution всех runtime binaries;
-- isolated TUN/veth forwarding и lab AWG3 interop, не production production-edge path;
+- isolated TUN/veth forwarding и lab AWG3 interop, не production-edge path;
 - проверить install/start/stop/reboot/uninstall generated script;
 - подтвердить cleanup до нуля acceptance artifacts;
 - не менять существующие hAP production tunnels/routes/failover.

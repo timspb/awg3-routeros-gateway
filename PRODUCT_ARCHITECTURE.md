@@ -338,11 +338,11 @@ A release is invalid unless all pass:
 
 ## 7. Scope-safe hardware acceptance
 
-RB5009 acceptance is a prerequisite to the production production-edge mutation and may transition into the staged candidate after all stop-gates.
+RB5009 acceptance is a prerequisite to the production-edge mutation and may transition into the staged candidate after all stop-gates.
 
 hAP ac² acceptance is isolated:
 
-- no production production-edge/KVN/FBSH endpoint or policy-table mutation;
+- no endpoint or policy-table mutation on the production-edge/KVN/FBSH surfaces;
 - no failover/monitoring production-edge changes;
 - unique temporary object prefix;
 - local/lab AWG3 peer only;
