@@ -46,7 +46,18 @@ if [ -z "${child_pid}" ]; then
 fi
 
 kill -TERM "${gateway_pid}"
-wait "${gateway_pid}"
+gateway_rc=0
+if wait "${gateway_pid}"; then
+	gateway_rc=0
+else
+	gateway_rc=$?
+fi
+
+if [ "${gateway_rc}" -ne 0 ] && [ "${gateway_rc}" -ne 143 ]; then
+	cat "${STATE_DIR}/gateway.log"
+	echo "gateway exited with ${gateway_rc} during shutdown" >&2
+	exit 1
+fi
 
 if kill -0 "${child_pid}" 2>/dev/null; then
 	echo "runtime child still alive after gateway shutdown" >&2
