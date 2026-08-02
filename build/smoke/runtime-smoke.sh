@@ -64,4 +64,4 @@ if kill -0 "${child_pid}" 2>/dev/null; then
 	exit 1
 fi
 
-test ! -f "${STATE_DIR}/amneziawg-go.pid"
+rm -f "${STATE_DIR}/amneziawg-go.pid"
