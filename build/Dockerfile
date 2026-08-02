@@ -73,7 +73,7 @@ RUN set -eux; \
 		/tmp/amneziawg-tools/src/curve25519.c \
 		/tmp/amneziawg-tools/src/type.c; \
 	if [ "${target_pkg_arch}" = "amd64" ]; then \
-		cp -L /usr/sbin/ip /rootfs/usr/sbin/ip; \
+		cp /bin/ip /rootfs/usr/sbin/ip; \
 		chmod 0755 /rootfs/usr/sbin/ip; \
 		install -D -m 0755 /usr/sbin/sysctl /rootfs/usr/sbin/sysctl; \
 		ip_version="$(dpkg-query -W -f='${Version}' iproute2)"; \
