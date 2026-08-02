@@ -1,8 +1,8 @@
-# AWG3: исследование мутации AEZA + RB5009
+# AWG3: исследование мутации production-edge + RB5009
 
 Дата исследования: 2026-08-01  
 Статус: research/design only; production не изменён  
-Scope: только `RB5009 / 192.168.1.1` и `AEZA / 213.176.116.165`  
+Scope: только `RB5009 / 192.168.1.1` и `production-edge / 213.176.116.165`  
 За пределами scope: TEKO, KVN, China, FBSH, TeleMT, monitoring 101, policy routing, failover
 
 ## 1. Итоговый вердикт
@@ -15,7 +15,7 @@ Scope: только `RB5009 / 192.168.1.1` и `AEZA / 213.176.116.165`
 
 1. AWG3 опубликован только 24 июля 2026 года. На 31 июля уже появились несколько исправлений в `amneziawg-go` и четыре последовательных тега kernel module. Это ещё не зрелый production baseline.
 2. Текущий MikroTik-контур использует `amneziawg-mikrotik-c` / `awg-proxy`, а не `amneziawg-go` как сетевой интерфейс.
-3. `awg-proxy` является прозрачным преобразователем AWG-пакетов между RouterOS WireGuard и обычным WireGuard backend на AEZA. Официальный `amneziawg-go` является полноценной реализацией WireGuard-интерфейса и не является drop-in packet proxy.
+3. `awg-proxy` является прозрачным преобразователем AWG-пакетов между RouterOS WireGuard и обычным WireGuard backend на production-edge. Официальный `amneziawg-go` является полноценной реализацией WireGuard-интерфейса и не является drop-in packet proxy.
 4. В проверенном source tree `amneziawg-mikrotik-c` отсутствуют AWG3 Header Protection, Content Padding и настраиваемые таймеры.
 5. Поэтому замена только бинарников/tools/config внутри существующего контейнера **не доказана и с официальными бинарниками напрямую невозможна** при требовании сохранить RouterOS WG/monitoring contract.
 6. В `amneziawg-tools v3.0.20260730` обнаружен как минимум один QA-сигнал: `show.c` содержит spelling `max-handshake-attemps`, тогда как конфигурационный параметр называется `MaxHandshakeAttempts`. До стенда нельзя считать round-trip `set/show/showconf` доказанным.
@@ -24,18 +24,18 @@ Scope: только `RB5009 / 192.168.1.1` и `AEZA / 213.176.116.165`
 
 Если будет создана и отдельно проверена AWG3-версия **того же transparent proxy**, можно сохранить внешний контракт полностью:
 
-- RouterOS interface `WG-AEZA`;
+- RouterOS interface `WG-production-edge`;
 - RouterOS `ListenPort = 12955`;
 - tunnel subnet `10.99.99.0/24`;
 - RouterOS peer endpoint на прежний IP контейнера и UDP/51820;
 - существующий veth/bridge;
 - MTU 1280;
 - маршруты, firewall, NAT;
-- container object `awg-aeza-fixed`, root-dir/layer-dir;
+- container object `awg-production-edge-fixed`, root-dir/layer-dir;
 - `Container_Storage_Guard` lifecycle;
-- monitoring contract по `WG-AEZA` handshake/counters;
-- AEZA public UDP/443;
-- AEZA backend interface/address/peer identities.
+- monitoring contract по `WG-production-edge` handshake/counters;
+- production-edge public UDP/443;
+- production-edge backend interface/address/peer identities.
 
 Без AWG3-capable transparent proxy официальный путь требует изменить внутреннюю архитектуру: завершать AWG3 как L3-интерфейс внутри контейнера и строить отдельную локальную связь RouterOS↔container. Это уже не «замена бинарников» и создаёт двойной/вложенный tunnel contract. Для первой волны такой вариант отклонён.
 
@@ -65,10 +65,10 @@ There are no GitHub Releases in `amneziawg-go`; production must pin a signed/rec
 
 RB5009:
 
-- container: `awg-aeza-fixed`;
-- persistent root: `/usb2-part1/controot/awg-aeza-fixed`;
+- container: `awg-production-edge-fixed`;
+- persistent root: `/usb2-part1/controot/awg-production-edge-fixed`;
 - layer dir: `/usb2-part1/clayers`;
-- RouterOS interface: `WG-AEZA`;
+- RouterOS interface: `WG-production-edge`;
 - MTU: 1280;
 - ListenPort: 12955;
 - peer endpoint: container `172.18.0.2:51820`;
@@ -76,13 +76,13 @@ RB5009:
 - keepalive: 25 seconds;
 - proxy remote: `213.176.116.165:443`;
 - fixed outer source port: 38080;
-- AEZA must remain WAN-only.
+- production-edge must remain WAN-only.
 
-AEZA:
+production-edge:
 
-- service: `awg-proxy-aeza`;
+- service: `awg-proxy-production-edge`;
 - public listener: UDP/443;
-- backend: `wg-aeza-awg`, `127.0.0.1:2057`;
+- backend: `wg-production-edge-awg`, `127.0.0.1:2057`;
 - tunnel subnet: `10.99.99.0/24`;
 - WARP/NAT/routing remain out of mutation scope.
 
@@ -132,7 +132,7 @@ Build-time upstream заявляет C compiler + sane libc. Для полног
 
 Не является протоколом и не обязателен. Это convenience lifecycle wrapper.
 
-Для AEZA возможен, но production-профиль должен выбрать **одного** владельца lifecycle: либо `awg-quick@awg0.service`, либо собственный unit, но не оба.
+Для production-edge возможен, но production-профиль должен выбрать **одного** владельца lifecycle: либо `awg-quick@awg0.service`, либо собственный unit, но не оба.
 
 Для RouterOS container `awg-quick` не решает главную проблему: он создаёт L3 AWG interface, а не transparent proxy.
 
@@ -163,16 +163,16 @@ Production image должен содержать только реально и�
 
 | Contract | Сохраняется при AWG3 proxy | Official AWG3 direct | Комментарий |
 |---|---|---|---|
-| RouterOS interface `WG-AEZA` | да | нет как AWG3 endpoint | RouterOS говорит обычным WG |
+| RouterOS interface `WG-production-edge` | да | нет как AWG3 endpoint | RouterOS говорит обычным WG |
 | RouterOS ListenPort 12955 | да | можно оставить, но он относится к local WG | Не AWG3 public port |
 | Tunnel subnet 10.99.99.0/24 | да | да | L3 addressing не зависит от obfuscation |
 | veth/bridge | да | физически да | Direct design потребует другого L3 contract поверх veth |
 | MTU 1280 | да | да | Консервативно оставляем без PMTU-доказательства |
-| Public UDP/443 AEZA | да | да | TCP/443 не затрагивается |
+| Public UDP/443 production-edge | да | да | TCP/443 не затрагивается |
 | Routes | да | не гарантировано | L3 direct interface меняет next-hop/interface semantics |
 | Firewall/NAT | да | не гарантировано | Interface owner/name может измениться |
 | systemd/container lifecycle | да | меняется внутренний процесс | Имена объектов можно сохранить |
-| Monitoring `WG-AEZA` handshake | да | нет | Official AWG3 handshake будет внутри container |
+| Monitoring `WG-production-edge` handshake | да | нет | Official AWG3 handshake будет внутри container |
 | Existing WireGuard keys/PSK | да, если proxy preserves model | да | HeaderProtectionKey добавляется отдельно |
 | Existing J/H/I/S | да после parser compatibility tests | да | AWG3 remains configurable with old fields |
 | Rollback by old image/config | да | сложнее | Direct redesign имеет больше rollback surface |
@@ -275,7 +275,7 @@ Production image должен содержать только реально и�
 ### 5.8. PersistentKeepalive как range
 
 - Что изменилось: peer parameter теперь допускает `low-high`, а не только фиксированное число.
-- Рекомендация для NATed RB5009: `23-27` s. На AEZA server peer — off/0, если серверу не нужно инициировать NAT keepalive.
+- Рекомендация для NATed RB5009: `23-27` s. На production-edge server peer — off/0, если серверу не нужно инициировать NAT keepalive.
 - Совместимость: old tools/binaries ожидают scalar; v3 range требует v3 обеих управляющих частей, но runtime choice локален.
 - Производительность: средняя частота остаётся около прежних 25 s.
 - DPI: устраняет точный 25-second cadence.
@@ -303,9 +303,9 @@ Production image должен содержать только реально и�
 - Timing ranges должны центрироваться вокруг WireGuard defaults.
 - Server и client получают одинаковые `S/H` и HeaderProtectionKey; client-side J/I/Content/Timings могут отличаться.
 
-### 6.2. Target profile `AWG3-AEZA-RB5009-P1`
+### 6.2. Target profile `AWG3-production-edge-RB5009-P1`
 
-| Parameter | RB5009 sender | AEZA sender | Причина |
+| Parameter | RB5009 sender | production-edge sender | Причина |
 |---|---:|---:|---|
 | Jc | 4 | 0 | junk только на инициаторе достаточно |
 | Jmin/Jmax | 50/1000 | 0/0 | сохранить working AWG2 envelope; 1000 < MTU 1280 |
@@ -326,14 +326,14 @@ Production image должен содержать только реально и�
 
 ## 7. Целевые конфигурации (не для применения)
 
-### 7.1. AEZA — official AWG3 reference
+### 7.1. production-edge — official AWG3 reference
 
-Этот config корректен для **direct official AWG3 interface**, но не является drop-in replacement текущего `awg-proxy-aeza`, пока RB5009-side transparent proxy не поддерживает AWG3.
+Этот config корректен для **direct official AWG3 interface**, но не является drop-in replacement текущего `awg-proxy-production-edge`, пока RB5009-side transparent proxy не поддерживает AWG3.
 
 ```ini
-# /etc/amnezia/awg-aeza.conf — DESIGN ONLY
+# /etc/amnezia/awg-production-edge.conf — DESIGN ONLY
 [Interface]
-PrivateKey = <EXISTING_AEZA_WG_PRIVATE_KEY>
+PrivateKey = <EXISTING_production-edge_WG_PRIVATE_KEY>
 Address = 10.99.99.1/24
 ListenPort = 443
 MTU = 1280
@@ -364,7 +364,7 @@ AllowedIPs = 10.99.99.4/32
 PersistentKeepalive = 0
 ```
 
-AEZA routes, WARP policy, NAT and firewall rules are intentionally absent: they must be retained byte-for-byte from live baseline, not regenerated from this research document.
+production-edge routes, WARP policy, NAT and firewall rules are intentionally absent: they must be retained byte-for-byte from live baseline, not regenerated from this research document.
 
 ### 7.2. RB5009 container — required AWG3 proxy contract
 
@@ -399,7 +399,7 @@ AWG_REJECT_AFTER_TIME=175-190
 AWG_KEEPALIVE_TIMEOUT=9-11
 AWG_MAX_HANDSHAKE_ATTEMPTS=16-20
 AWG_PERSISTENT_KEEPALIVE=23-27
-AWG_SERVER_PUB=<EXISTING_AEZA_WG_PUBLIC_KEY>
+AWG_SERVER_PUB=<EXISTING_production-edge_WG_PUBLIC_KEY>
 AWG_CLIENT_PUB=<EXISTING_RB5009_WG_PUBLIC_KEY>
 AWG_LOG_LEVEL=info
 AWG_TIMEOUT=60
@@ -412,7 +412,7 @@ AWG_NO_GRO=1
 
 ```routeros
 # DESIGN ASSERTIONS, not mutation commands
-# interface: WG-AEZA
+# interface: WG-production-edge
 # mtu: 1280
 # listen-port: 12955
 # peer endpoint: 172.18.0.2:51820
@@ -426,7 +426,7 @@ RouterOS keepalive остаётся 25 s, потому что RouterOS види�
 
 ### Phase 0 — обязательные предварительные gates
 
-1. Зафиксировать exact live read-only snapshots AEZA и RB5009.
+1. Зафиксировать exact live read-only snapshots production-edge и RB5009.
 2. Зафиксировать image digest, binary SHA-256, config hashes, service/container definitions, routes/rules/firewall/NAT, sockets, keys-as-public-identities.
 3. Получить AWG3-capable `amneziawg-mikrotik-c` build или реализовать AWG3 в том же proxy model.
 4. Unit tests: v2 vectors, v3 header protection, content padding, all timer ranges, invalid range rejection, `S1-S4 < 12` rejection.
@@ -435,9 +435,9 @@ RouterOS keepalive остаётся 25 s, потому что RouterOS види�
 7. 24-hour lab soak, затем 72-hour pre-production soak с packet loss/reorder/NAT rebinding/restart tests.
 8. Только после этого назначить immutable versions/digests production baseline.
 
-### Phase 1 — AEZA first
+### Phase 1 — production-edge first
 
-AEZA нельзя переключать на AWG3 раньше client readiness. Поэтому «AEZA first» означает подготовить artefacts и atomic rollback, затем короткое coordinated cutover window.
+production-edge нельзя переключать на AWG3 раньше client readiness. Поэтому «production-edge first» означает подготовить artefacts и atomic rollback, затем короткое coordinated cutover window.
 
 1. Read-only audit и backup:
    - unit, env/config, executable/image, backend WG config;
@@ -446,9 +446,9 @@ AEZA нельзя переключать на AWG3 раньше client readiness
 2. Подготовить AWG3 binary/config вне active paths.
 3. Проверить hashes, owner/mode, syntax/parser offline.
 4. Не запускать второй постоянный service. Допустим только foreground loopback/offline self-test без public listener.
-5. В coordinated window остановить `awg-proxy-aeza` и запустить AWG3 replacement под **тем же unit name**, UDP/443 и backend contract.
+5. В coordinated window остановить `awg-proxy-production-edge` и запустить AWG3 replacement под **тем же unit name**, UDP/443 и backend contract.
 6. Проверить socket ownership, process version/config fingerprint и отсутствие второго listener.
-7. Если RB5009 cutover не начат немедленно или server health failed — rollback AEZA.
+7. Если RB5009 cutover не начат немедленно или server health failed — rollback production-edge.
 
 ### Phase 2 — RB5009
 
@@ -469,14 +469,14 @@ AEZA нельзя переключать на AWG3 раньше client readiness
 
 Порядок обязательный:
 
-1. AEZA: ровно один UDP/443 owner; ожидаемый PID/version.
+1. production-edge: ровно один UDP/443 owner; ожидаемый PID/version.
 2. RB5009 container: running; veth/bridge unchanged; local UDP/51820 owner.
-3. Outer conntrack: destination AEZA/443, source port 38080, reply-dst только WAN address; не IPTV/LTE.
-4. Fresh RouterOS `WG-AEZA` handshake после cutover timestamp.
+3. Outer conntrack: destination production-edge/443, source port 38080, reply-dst только WAN address; не IPTV/LTE.
+4. Fresh RouterOS `WG-production-edge` handshake после cutover timestamp.
 5. RX и TX растут в обе стороны; не принимать старые accumulated counters.
 6. `ping 10.99.99.1`.
-7. Controlled payload through AEZA table without changing selector/failover.
-8. DNS and WARP egress checks only inside AEZA path.
+7. Controlled payload through production-edge table without changing selector/failover.
+8. DNS and WARP egress checks only inside production-edge path.
 9. Packet capture confirms:
    - Header Protection enabled;
    - no stable AWG2 header values;
@@ -484,8 +484,8 @@ AEZA нельзя переключать на AWG3 раньше client readiness
    - no fragmentation;
    - timing ranges statistically observed.
 10. CPU, memory, packet loss, RTT, throughput; compare with AWG2 baseline.
-11. Restart RB container, restart AEZA unit, WAN DHCP renewal/NAT rebinding.
-12. Soak and reconnect tests; monitoring 101 remains untouched but continues to see the same `WG-AEZA` contract.
+11. Restart RB container, restart production-edge unit, WAN DHCP renewal/NAT rebinding.
+12. Soak and reconnect tests; monitoring 101 remains untouched but continues to see the same `WG-production-edge` contract.
 
 ### Phase 4 — acceptance
 
@@ -521,7 +521,7 @@ Immediate rollback on any:
 ### 9.2. Rollback order
 
 1. RB5009 first: stop mutated container, restore exact AWG2 image digest/env/config under existing object/veth/lifecycle, start it.
-2. AEZA second: stop AWG3 replacement, restore exact AWG2 binary/config/unit content, start same `awg-proxy-aeza` unit.
+2. production-edge second: stop AWG3 replacement, restore exact AWG2 binary/config/unit content, start same `awg-proxy-production-edge` unit.
 3. Проверить one-owner sockets, fresh AWG2 handshake, RX/TX, `10.99.99.1`, WAN-only conntrack.
 4. Сравнить routes/rules/firewall/NAT with pre-change hashes.
 5. Не включать KVN/FBSH failover как способ скрыть неуспешный rollback; failover вне scope.
@@ -544,7 +544,7 @@ Rollback не должен требовать package manager, image pull или
 | RouterOS storage regression | container fails after reboot | `usb2-part1`; reboot/restart validation |
 | Wrong WAN source/return path | tunnel down | conntrack `reply-dst-address`; DHCP renewal test |
 | Identity split | TX no RX | public-key chain validation end to end |
-| Monitoring loses semantics | invisible failure | same `WG-AEZA` interface and fresh timestamps |
+| Monitoring loses semantics | invisible failure | same `WG-production-edge` interface and fresh timestamps |
 | Rollback depends on network | prolonged outage | local immutable AWG2 artifacts before window |
 
 ## 11. Открытые технические вопросы
@@ -559,7 +559,7 @@ Rollback не должен требовать package manager, image pull или
 6. Если timers принадлежат endpoint state machine, возможно ли вообще честно реализовать их в прозрачном proxy? Вероятный ответ: нет; тогда «все AWG3 функции» и «тот же RouterOS WG contract» логически несовместимы.
 7. Поддерживает ли production target `amneziawg-tools v3` все fields без silent truncation/typos?
 8. Каков измеренный outer packet-size максимум при текущих I/J/S и ContentPadding 0-32?
-9. Какой rollback RTO принимается для coordinated AEZA/RB5009 cutover?
+9. Какой rollback RTO принимается для coordinated production-edge/RB5009 cutover?
 
 ## 12. Архитектурное решение
 

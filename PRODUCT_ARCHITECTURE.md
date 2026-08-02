@@ -117,7 +117,7 @@ The common config model must express, without platform defaults:
 - main/WAN endpoint exclusion;
 - optional NAT mode derived from the live design.
 
-The AEZA/RB5009 production deployment reads existing live values; the product must not invent subnet/interface/table names.
+The production-edge/RB5009 production deployment reads existing live values; the product must not invent subnet/interface/table names.
 
 ### 4.2. Environment schema
 
@@ -278,7 +278,7 @@ One projection contract for every deployment:
 - safe AWG3 profile/features;
 - egress/path probes.
 
-The production mutation updates the existing `RB5009 → AEZA` edge. ARMv5 hardware acceptance must use an isolated test identity and must be removed after the test.
+The production mutation updates the existing `RB5009 → production-edge` edge. ARMv5 hardware acceptance must use an isolated test identity and must be removed after the test.
 
 ## 5. Deployment adapters
 
@@ -338,11 +338,11 @@ A release is invalid unless all pass:
 
 ## 7. Scope-safe hardware acceptance
 
-RB5009 acceptance is a prerequisite to the production AEZA mutation and may transition into the staged candidate after all stop-gates.
+RB5009 acceptance is a prerequisite to the production production-edge mutation and may transition into the staged candidate after all stop-gates.
 
 hAP ac² acceptance is isolated:
 
-- no production AEZA/KVN/FBSH endpoint or policy-table mutation;
+- no production production-edge/KVN/FBSH endpoint or policy-table mutation;
 - no failover/monitoring production-edge changes;
 - unique temporary object prefix;
 - local/lab AWG3 peer only;

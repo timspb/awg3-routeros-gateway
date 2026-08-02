@@ -1,9 +1,9 @@
-# Handoff младшей модели: AWG3 RouterOS Gateway и мутация AEZA ↔ RB5009
+# Handoff младшей модели: AWG3 RouterOS Gateway и мутация production-edge ↔ RB5009
 
 Дата: 2026-08-02  
 Роль исполнителя: выполнить изменение и собрать доказательства  
 Роль принимающей модели: проверить evidence, diff scope, acceptance и cleanup  
-Execution scope: AEZA, RB5009/192.168.1.1 и существующая запись Monitoring 101 `RB5009 → AEZA`; hAP ac² участвует только как ARMv5 hardware-acceptance target
+Execution scope: production-edge, RB5009/192.168.1.1 и существующая запись Monitoring 101 `RB5009 → production-edge`; hAP ac² участвует только как ARMv5 hardware-acceptance target
 
 Продуктовый scope: единый `AWG3 RouterOS Gateway` с OCI targets `linux/arm64`, `linux/arm/v5`, `linux/amd64`.
 
@@ -47,18 +47,18 @@ ARMv5 steady state имеет отдельный resource constraint, но не 
 
 Исполнитель имеет право:
 
-- выполнять read-only аудит AEZA, RB5009 и relevant Monitoring 101 runtime;
+- выполнять read-only аудит production-edge, RB5009 и relevant Monitoring 101 runtime;
 - собрать official AWG3 из закреплённых commit SHA;
 - выполнить краткоживущий capability probe RouterOS Container;
 - выполнить отдельный non-production hardware acceptance на RB5009 arm64 и hAP ac² ARMv5;
-- после PASS всех preflight gates провести coordinated mutation AEZA и RB5009;
-- изменить только AEZA-specific routes/rules/container/monitoring provider;
-- после полного acceptance удалить старые AEZA AWG2 artifacts.
+- после PASS всех preflight gates провести coordinated mutation production-edge и RB5009;
+- изменить только production-edge-specific routes/rules/container/monitoring provider;
+- после полного acceptance удалить старые production-edge AWG2 artifacts.
 
 Исполнитель не имеет права:
 
 - менять KVN, TEKO, VLESS/Xray, FBSH, China, AGH, TeleMT, failover selector или другие nodes;
-- включать hAP ac² в production AEZA routing/migration; на нём разрешён только isolated product acceptance;
+- включать hAP ac² в production production-edge routing/migration; на нём разрешён только isolated product acceptance;
 - собирать ARM32 как generic `linux/arm` без `GOARM=5` и OCI variant `v5`;
 - добавлять на ARMv5 Python, Node.js, nginx, systemd, database, отдельный UI daemon или тяжёлый framework;
 - хранить secrets в image/App manifest/installer/env report либо логировать request bodies;
@@ -67,7 +67,7 @@ ARMv5 steady state имеет отдельный resource constraint, но не 
 - продолжать после failed gate;
 - удалять старый рабочий контур до доказанного запуска candidate и наличия точного восстановимого AWG2 source/digest;
 - считать наличие параметра в конфиге доказательством его работы;
-- делать reboot AEZA без отдельной оценки безопасности текущего окна;
+- делать reboot production-edge без отдельной оценки безопасности текущего окна;
 - коммитить production secrets или live configs с ключами.
 
 ## 2. Обязательное уточнение исходного задания
@@ -92,7 +92,7 @@ ARMv5 steady state имеет отдельный resource constraint, но не 
 4. `E:\CODEX\My_Local\MASTER_NETWORK_MAP.md`
 5. `E:\CODEX\My_Local\AWG2_GOLDEN_CONFIGURATION.md`
 6. `E:\CODEX\My_Local\AWG2_GOLDEN_STATE_2026-07-04.md`
-7. `E:\CODEX\My_Local\AWG3_ROUTEROS_GATEWAY\docs\AWG3_AEZA_RB5009_MUTATION_RESEARCH_2026-08-01.md`
+7. `E:\CODEX\My_Local\AWG3_ROUTEROS_GATEWAY\docs\AWG3_PRODUCTION_EDGE_RB5009_MUTATION_RESEARCH_2026-08-01.md`
 8. `E:\CODEX\My_Local\AWG3_ROUTEROS_GATEWAY\PRODUCT_ARCHITECTURE.md`
 
 Документы и старые snapshots — orientation only. Перед mutation каждое имя, address, rule, route и lifecycle owner подтвердить live.
@@ -103,11 +103,11 @@ ARMv5 steady state имеет отдельный resource constraint, но не 
 
 PASS только если:
 
-- exact targets однозначно сопоставлены AEZA и RB5009;
+- exact targets однозначно сопоставлены production-edge и RB5009;
 - есть current live export/report без secret values;
 - известен exact AWG2 image/binary/config source для rollback;
-- операторский доступ к обоим узлам независим от AEZA tunnel;
-- изменение AEZA не оборвёт текущую SSH/control session;
+- операторский доступ к обоим узлам независим от production-edge tunnel;
+- изменение production-edge не оборвёт текущую SSH/control session;
 - KVN/FBSH/direct WAN доступны как control path, но не будут использоваться как скрытая acceptance substitution.
 
 Иначе STOP.
@@ -143,7 +143,7 @@ Read-only сначала:
 - `/interface veth print detail`
 - `/disk print detail`
 
-Probe должен быть краткоживущим и не создавать transport до AEZA:
+Probe должен быть краткоживущим и не создавать transport до production-edge:
 
 1. Передать реальный host device через RouterOS container `devices=` mechanism.
 2. Внутри probe подтвердить character device `/dev/net/tun` и успешный `TUNSETIFF`.
@@ -196,11 +196,11 @@ PASS только если для amd64, arm64 и arm/v5:
 До cutover подготовить и доказать статически:
 
 - veth RouterOS-facing IP и container IP остаются прежними;
-- AEZA routing table остаётся прежней;
+- production-edge routing table остаётся прежней;
 - default/required routes в этой table указывают на existing container gateway;
-- public endpoint `213.176.116.165/32` никогда не lookup через AEZA table;
+- public endpoint `213.176.116.165/32` никогда не lookup через production-edge table;
 - outer AWG3 packets выходят main/WAN;
-- AEZA остаётся WAN-only, не LTE и не IPTV;
+- production-edge остаётся WAN-only, не LTE и не IPTV;
 - route/rule ordering не меняет KVN/FBSH/direct ISP paths;
 - endpoint exception обновляется при WAN DHCP change либо использует доказанный динамический mechanism; одноразовый `/32` через текущий DHCP gateway не является durable fix.
 
@@ -212,7 +212,7 @@ PASS только если для amd64, arm64 и arm/v5:
 
 Собрать один рабочий Markdown evidence report, без secret values и backup archives.
 
-AEZA:
+production-edge:
 
 - OS/kernel/architecture;
 - `ip -br link/address`, routes, rules;
@@ -227,7 +227,7 @@ AEZA:
 RB5009:
 
 - RouterOS version/architecture/packages/device-mode;
-- AEZA WG interface, peer, address, routes/rules/marks/comments;
+- production-edge WG interface, peer, address, routes/rules/marks/comments;
 - exact ownership: убедиться, что interface не имеет чужих peers;
 - container object/env/mounts/veth/bridge/root-dir/layer-dir;
 - `Container_Storage_Guard`, WAN DHCP hook, `RU_Uplink_Control` references;
@@ -241,7 +241,7 @@ Deliverable checkpoint: таблица `object → current value → planned act
 
 Собрать вне production runtime:
 
-- AEZA/CI amd64 binary/runtime;
+- production-edge/CI amd64 binary/runtime;
 - RB5009 arm64 OCI image;
 - hAP ac² compatible `linux/arm/v5` OCI image;
 - один multi-architecture OCI index, закреплённый digest;
@@ -297,7 +297,7 @@ ARMv5 `/container` installer:
 - проверяет `architecture-name`, RouterOS version, container package/device-mode, storage и отсутствие name/address collision;
 - создаёт ordinary `/container`, veth/mount/env wiring только для isolated acceptance namespace;
 - имеет generated uninstall/cleanup section, удаляющий только objects с уникальным acceptance prefix;
-- не изменяет production hAP routes, failover, KVN/AEZA/WG-VPN paths;
+- не изменяет production hAP routes, failover, KVN/production-edge/WG-VPN paths;
 - не содержит secret values: secrets вводятся/подключаются отдельно по общей schema.
 - создаёт persistent `/config` mount и проверяет права `0600`;
 - создаёт RouterOS control actions для authenticated `ui-open`/`ui-close` через management veth;
@@ -319,7 +319,7 @@ hAP ac² ARMv5:
 
 - только ordinary `/container`; `/app` не использовать;
 - подтвердить actual CPU/ABI execution всех runtime binaries;
-- isolated TUN/veth forwarding и lab AWG3 interop, не production AEZA path;
+- isolated TUN/veth forwarding и lab AWG3 interop, не production production-edge path;
 - проверить install/start/stop/reboot/uninstall generated script;
 - подтвердить cleanup до нуля acceptance artifacts;
 - не менять существующие hAP production tunnels/routes/failover.
@@ -376,28 +376,28 @@ Fault-injection обязателен после каждой стадии: stagi
 
 ARM64 может иметь `ui_mode=always`; ARMv5 только `ui_mode=on_demand`. Других различий API/schema/UI logic быть не должно.
 
-### Phase 4 — staged AEZA cutover
+### Phase 4 — staged production-edge cutover
 
 1. Проверить active control path и baseline VLESS/Xray/AGH непосредственно перед окном.
 2. Подготовить candidate files/config, не занимая public UDP/443 вторым permanent service.
-3. Остановить только old `awg-proxy-aeza`/backend данного AEZA contour.
+3. Остановить только old `awg-proxy-production-edge`/backend данного production-edge contour.
 4. Не удалять old artifacts на этом этапе.
 5. Запустить official AWG3 endpoint под согласованным lifecycle owner и прежним logical interface/tunnel IP/UDP port.
 6. Проверить one-owner UDP listener, interface/address/routes/NAT и отсутствие изменений VLESS/Xray/AGH.
 7. Перейти к RB5009 немедленно.
 
-Если любой check не проходит — восстановить AEZA AWG2 из preflight recovery source и STOP.
+Если любой check не проходит — восстановить production-edge AWG2 из preflight recovery source и STOP.
 
 ### Phase 5 — staged RB5009 cutover
 
-1. Остановить old `awg-aeza-fixed` proxy container.
+1. Остановить old `awg-production-edge-fixed` proxy container.
 2. Не удалять его rootfs/object до working AWG3 payload acceptance.
 3. Развернуть new ARM64 gateway через подготовленный custom App adapter на existing RouterOS-facing network contract; App не должен автоматически создавать конфликтующую адресацию/маршруты.
 4. Внутри container поднять official AWG3 interface с прежним logical tunnel name/IP/MTU.
 5. Включить IP forwarding; применять NAT внутри container только если inventory доказал необходимость.
-6. Переключить existing AEZA routing table next-hop с RouterOS WG на existing container gateway.
+6. Переключить existing production-edge routing table next-hop с RouterOS WG на existing container gateway.
 7. Создать durable main/WAN endpoint exclusion без LTE/IPTV fallback.
-8. Только после fresh AWG3 handshake и bidirectional payload удалить AEZA native WG peer/interface/address из RouterOS.
+8. Только после fresh AWG3 handshake и bidirectional payload удалить production-edge native WG peer/interface/address из RouterOS.
 9. Адаптировать `Container_Storage_Guard` к одному новому container owner, не трогая KVN.
 
 До удаления RouterOS WG обязательно проверить, что interface не имеет других peers/addresses/dependencies.
@@ -406,7 +406,7 @@ ARM64 может иметь `ui_mode=always`; ARMv5 только `ui_mode=on_dem
 
 Только после transport PASS:
 
-- сохранить тот же logical edge `RB5009 → AEZA`;
+- сохранить тот же logical edge `RB5009 → production-edge`;
 - заменить provider на container/`amneziawg-go`;
 - установить `transport_family=awg3`;
 - сохранить logical interface identity/tunnel addressing;
@@ -424,7 +424,7 @@ Monitoring PASS требует fresh runtime timestamp и корреляцию �
 | Group | Required evidence |
 |---|---|
 | Transport | interface UP, fresh handshake, RX/TX growth, tunnel ping |
-| Routing | lookup from relevant sources, AEZA table next-hop, no recursion/leak |
+| Routing | lookup from relevant sources, production-edge table next-hop, no recursion/leak |
 | Outer path | pcap/conntrack shows UDP/443 through main/WAN only |
 | Egress | expected public IP, TCP, UDP, DNS, upload/download |
 | MTU | PMTU, large payload, no blackhole, no fragment at max J/padding |
@@ -437,37 +437,37 @@ Monitoring PASS требует fresh runtime timestamp и корреляцию �
 | ARMv5 memory | only two steady processes; measured RSS/PSS within declared budget |
 | Config control | open/apply/cancel/timeout, atomic rollback, 0600, redaction |
 | Config security | wrong owner/mode fail closed; no secrets in image/metadata/installer/logs/status/temp files |
-| AEZA restart | service restores without touching VLESS/Xray |
+| production-edge restart | service restores without touching VLESS/Xray |
 | Unchanged | KVN, FBSH, direct ISP, TEKO/VLESS, Xray, AGH |
-| Monitoring | exactly one AEZA edge, fresh AWG3 provider data |
+| Monitoring | exactly one production-edge edge, fresh AWG3 provider data |
 
-AEZA reboot выполнить только если control path, window и service boot persistence позволяют безопасно это сделать. Если reboot небезопасен, acceptance остаётся **incomplete**, а не PASS.
+production-edge reboot выполнить только если control path, window и service boot persistence позволяют безопасно это сделать. Если reboot небезопасен, acceptance остаётся **incomplete**, а не PASS.
 
 ### Phase 8 — destructive cleanup
 
 Cleanup разрешён только после PASS Phase 7 и отдельного финального pre-cleanup diff.
 
-Удалить только точно сопоставленные AEZA-contour artifacts:
+Удалить только точно сопоставленные production-edge-contour artifacts:
 
 - old `awg-proxy` binary/service/config/backend WG interface;
 - old RB5009 AWG2 container/rootfs/env/mounts;
-- old RouterOS AEZA WG peer/interface/address;
+- old RouterOS production-edge WG peer/interface/address;
 - transient probe/build/import artifacts;
 - old monitoring provider/evidence;
 - unused old keys после доказательства, что они не принадлежат другим peers.
 
 Перед каждым remove выполнить read-only dependency search. Если найден внешний consumer — не удалять, STOP и описать зависимость.
 
-После cleanup повторить всю unchanged-contour и core transport проверку. Final state должен содержать один AEZA transport, один container owner, один Monitoring edge и ноль disabled legacy objects.
+После cleanup повторить всю unchanged-contour и core transport проверку. Final state должен содержать один production-edge transport, один container owner, один Monitoring edge и ноль disabled legacy objects.
 
 ## 6. Rollback checkpoints
 
 | Checkpoint | Действие rollback |
 |---|---|
 | capability/build failed | удалить только probe/build artifacts; production untouched |
-| AEZA candidate failed before RB cutover | stop candidate; restore old AEZA proxy/backend |
+| production-edge candidate failed before RB cutover | stop candidate; restore old production-edge proxy/backend |
 | RB candidate failed before RouterOS WG deletion | stop candidate; start old container; old RouterOS WG remains |
-| failed after WG deletion but before cleanup | restore RouterOS WG from live inventory, start old container, restore AEZA proxy |
+| failed after WG deletion but before cleanup | restore RouterOS WG from live inventory, start old container, restore production-edge proxy |
 | failed after cleanup | reconstruct exact AWG2 from pre-proven immutable source/digests; this path must be rehearsed before cleanup |
 
 Rollback trigger: no fresh handshake within two rekey windows, TX without RX, wrong WAN source, recursion, route diff outside scope, VLESS/Xray/AGH regression, KVN/FBSH regression, parser silent-ignore, fragmentation, resource saturation или failed restart.
@@ -483,8 +483,8 @@ Rollback trigger: no fresh handshake within two rekey windows, TX without RX, wr
 5. Before/after object mapping.
 6. Final topology/interface names/addresses/routes.
 7. Полный AWG3 profile без secret values.
-8. Каждый change на AEZA, RB5009 и Monitoring 101.
-9. Каждый deleted artifact с доказательством принадлежности AEZA contour.
+8. Каждый change на production-edge, RB5009 и Monitoring 101.
+9. Каждый deleted artifact с доказательством принадлежности production-edge contour.
 10. Таблицу acceptance `test → command/probe → timestamp → result → evidence excerpt`.
 11. CPU/RAM/RTT/loss/throughput before/after.
 12. Unchanged-contour evidence.
@@ -500,7 +500,7 @@ Rollback trigger: no fresh handshake within two rekey windows, TX without RX, wr
 ## 8. Инструкция младшей модели — копировать целиком
 
 ```text
-Ты исполнитель единого multi-architecture продукта AWG3 RouterOS Gateway и production-мутации AEZA ↔ RB5009 на официальный AWG3.
+Ты исполнитель единого multi-architecture продукта AWG3 RouterOS Gateway и production-мутации production-edge ↔ RB5009 на официальный AWG3.
 
 Работай строго по E:\CODEX\My_Local\AWG3_ROUTEROS_GATEWAY\docs\AWG3_MUTATION_JUNIOR_EXECUTION_HANDOFF_2026-08-02.md, PRODUCT_ARCHITECTURE.md и исходному production-промпту. Handoff определяет stop-gates, порядок, rollback и evidence; исходный промпт определяет конечную архитектуру.
 
@@ -511,11 +511,11 @@ Rollback trigger: no fresh handshake within two rekey windows, TX without RX, wr
 4. До любой mutation пройди Gates A-E. Failed gate означает немедленный STOP с точным blocker evidence.
 5. Главный Gate C: реальный /dev/net/tun + TUNSETIFF + CAP_NET_ADMIN + veth↔TUN forwarding + pinned ARM64 amneziawg-go в RouterOS Container. Не имитируй его чтением документации.
 6. Не удаляй старый AWG2 до working AWG3 acceptance. Не создавай .bak/.old/archive/rollback units. До cutover докажи exact recovery из существующего immutable source/digest.
-7. Pin official amneziawg-go и amneziawg-tools full commit SHA. AEZA и ARM64 image собирай из одного source pair. Не используй latest или third-party image.
-8. Выполни AEZA cutover, затем RB5009 cutover, затем Monitoring 101 provider update. Сохрани existing veth/link addressing/tunnel subnet/tunnel IP/logical AEZA edge/table/comments/operational intent.
-9. Public AEZA UDP endpoint обязан идти main/WAN, никогда через AEZA table, LTE или IPTV. Докажи route lookup и pcap/conntrack.
+7. Pin official amneziawg-go и amneziawg-tools full commit SHA. production-edge и ARM64 image собирай из одного source pair. Не используй latest или third-party image.
+8. Выполни production-edge cutover, затем RB5009 cutover, затем Monitoring 101 provider update. Сохрани existing veth/link addressing/tunnel subnet/tunnel IP/logical production-edge edge/table/comments/operational intent.
+9. Public production-edge UDP endpoint обязан идти main/WAN, никогда через production-edge table, LTE или IPTV. Докажи route lookup и pcap/conntrack.
 10. Подтверди каждый AWG3 field через setconf/showconf/dump и поведение трафика. Учти spelling/round-trip risk MaxHandshakeAttempts.
-11. RouterOS native AEZA WG и old proxy удаляй только после fresh AWG3 handshake, bidirectional payload и pre-cleanup acceptance. Перед remove ищи foreign dependencies.
+11. RouterOS native production-edge WG и old proxy удаляй только после fresh AWG3 handshake, bidirectional payload и pre-cleanup acceptance. Перед remove ищи foreign dependencies.
 12. После cleanup повтори transport, reboot/restart, MTU, idle/load, unchanged KVN/FBSH/direct/VLESS/Xray/AGH и Monitoring checks.
 13. При любом rollback trigger немедленно восстанови последний доказанный working state и остановись. Не маскируй failure переключением failover.
 14. Веди один evidence report с timestamps и точными command outputs без secrets. Не объявляй PASS по конфигу без runtime proof.
@@ -558,7 +558,7 @@ Rollback trigger: no fresh handshake within two rekey windows, TX without RX, wr
 - MTU/no-fragment proof;
 - restart + RB reboot recovery;
 - unchanged KVN/FBSH/direct/VLESS/Xray/AGH evidence;
-- exactly one Monitoring AEZA edge with fresh runtime;
+- exactly one Monitoring production-edge edge with fresh runtime;
 - dependency-checked cleanup;
 - final filesystem/container/service inventory;
 - truthful limitations and exact rollback result if one occurred.
@@ -569,9 +569,9 @@ Rollback trigger: no fresh handshake within two rekey windows, TX without RX, wr
 - использование third-party image/`latest`;
 - destructive cleanup до acceptance;
 - static DHCP `/32` workaround без renewal mechanism;
-- AEZA outer path через LTE/IPTV;
+- production-edge outer path через LTE/IPTV;
 - изменение KVN/failover/TEKO/VLESS/Xray/AGH;
-- два постоянных AEZA tunnels/containers/Monitoring records;
+- два постоянных production-edge tunnels/containers/Monitoring records;
 - `PASS` только на основании config presence;
 - reboot test пропущен, но отмечен PASS;
 - старый disabled WG/container оставлен после заявленного success.

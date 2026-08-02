@@ -10,7 +10,7 @@
 |---|---|---|
 | `linux/arm64` | RB5009 | RouterOS custom App |
 | `linux/arm/v5` | hAP ac² и совместимые ARM32 | ordinary RouterOS `/container` + generated installer |
-| `linux/amd64` | CI/lab и AEZA tooling/runtime | ordinary OCI/runtime |
+| `linux/amd64` | CI/lab and production tooling/runtime | ordinary OCI/runtime |
 
 Один source tree, один release, одна configuration model. Architecture-specific application forks запрещены.
 
@@ -21,10 +21,10 @@ ARMv5 steady state: только `amneziawg-go` и один статически
 ## Canonical project documents
 
 - `PRODUCT_ARCHITECTURE.md` — product invariants, layout, schemas and build matrix.
-- `docs/AWG3_AEZA_RB5009_MUTATION_RESEARCH_2026-08-01.md` — protocol/migration research.
+- `docs/AWG3_PRODUCTION_EDGE_RB5009_MUTATION_RESEARCH_2026-08-01.md` — protocol/migration research.
 - `docs/AWG3_MUTATION_JUNIOR_EXECUTION_HANDOFF_2026-08-02.md` — gated execution plan and junior-model instruction.
 
 ## Scope boundary
 
-Production wave: AEZA ↔ RB5009 only.  
+Production wave: private production target ↔ RB5009 only.  
 hAP ac²: isolated ARMv5 hardware acceptance only; its production routes/tunnels/failover are not migration scope.
