@@ -265,6 +265,13 @@ func (c *Controller) Stop(ctx context.Context) error {
 }
 
 func (c *Controller) Shutdown(ctx context.Context) error {
+	c.mu.Lock()
+	current := c.current
+	degraded := c.status.Degraded
+	c.mu.Unlock()
+	if current != nil && !degraded {
+		_ = c.Stop(ctx)
+	}
 	c.lifecycleCancel()
 	done := make(chan struct{})
 	go func() {

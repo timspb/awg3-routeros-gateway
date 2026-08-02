@@ -379,6 +379,31 @@ func TestControllerRecoveryRestartsUnexpectedExit(t *testing.T) {
 	t.Fatalf("controller never recovered from unexpected exit: %#v", ctrl.Status())
 }
 
+func TestControllerShutdownStopsRunningRuntime(t *testing.T) {
+	done := make(chan struct{})
+	ctrl, err := New(func(context.Context, config.Pair) (Process, error) {
+		return &shutdownProcess{done: done, pid: 5353}, nil
+	}, nil, nil, IgnoreStop)
+	if err != nil {
+		t.Fatalf("new controller failed: %v", err)
+	}
+	if err := ctrl.Start(context.Background(), pairForRuntime("gen-shutdown")); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	if err := ctrl.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown failed: %v", err)
+	}
+	select {
+	case <-done:
+	default:
+		t.Fatalf("expected runtime to be stopped during shutdown")
+	}
+	got := ctrl.Status()
+	if got.Running || got.Ready {
+		t.Fatalf("expected runtime to be stopped, got %#v", got)
+	}
+}
+
 func TestExecProcessWaitBroadcastsResult(t *testing.T) {
 	cmd := helperCommand(context.Background(), "exit0", "")
 	if err := cmd.Start(); err != nil {
@@ -520,6 +545,33 @@ func (p *holdProcess) Kill() error {
 func (p *holdProcess) Signal(os.Signal) error { return nil }
 
 func (p *holdProcess) Wait(context.Context) error {
+	<-p.done
+	return nil
+}
+
+type shutdownProcess struct {
+	done chan struct{}
+	pid  int
+}
+
+func (p *shutdownProcess) PID() int { return p.pid }
+
+func (p *shutdownProcess) Kill() error {
+	if p.done != nil {
+		select {
+		case <-p.done:
+		default:
+			close(p.done)
+		}
+	}
+	return nil
+}
+
+func (p *shutdownProcess) Signal(os.Signal) error {
+	return p.Kill()
+}
+
+func (p *shutdownProcess) Wait(context.Context) error {
 	<-p.done
 	return nil
 }
