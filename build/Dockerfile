@@ -157,12 +157,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends ca-certificates iproute2 procps; \
+	rm -f /usr/sbin/ip; \
+	cp /bin/ip /usr/sbin/ip; \
+	chmod 0755 /usr/sbin/ip; \
 	rm -rf /var/lib/apt/lists/*
 COPY --from=build /rootfs/gateway /gateway
 COPY --from=build /rootfs/usr/local/bin/amneziawg-go /usr/local/bin/amneziawg-go
 COPY --from=build /rootfs/usr/local/bin/awg /usr/local/bin/awg
 COPY --from=build /rootfs/usr/local/bin/awg3-parser-validate /usr/local/bin/awg3-parser-validate
-COPY --from=build /rootfs/usr/sbin/ip /usr/sbin/ip
 COPY --from=build /rootfs/etc/awg3/runtime-artifacts.json /etc/awg3/runtime-artifacts.json
 ENTRYPOINT ["/gateway"]
 
