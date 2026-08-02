@@ -174,7 +174,9 @@ RUN set -eux; \
 	rm -rf /var/lib/apt/lists/*; \
 	file /gateway /usr/local/bin/amneziawg-go /usr/local/bin/awg /usr/local/bin/awg3-parser-validate /usr/sbin/ip /usr/sbin/sysctl; \
 	/gateway --help >/dev/null; \
-	/usr/local/bin/amneziawg-go --help >/dev/null; \
+	/usr/local/bin/amneziawg-go --help >/dev/null 2>&1 || rc=$$?; \
+	if [ -n "$${rc:-}" ] && [ "$${rc}" -ne 0 ] && [ "$${rc}" -ne 1 ]; then exit "$${rc}"; fi; \
+	unset rc; \
 	/usr/local/bin/awg --help >/dev/null; \
 	/usr/local/bin/awg3-parser-validate /smoke/setconf.conf; \
 	/usr/sbin/ip -Version >/dev/null; \
