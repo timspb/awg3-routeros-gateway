@@ -1,4 +1,4 @@
-ARG TARGETOS
+﻿ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
@@ -193,12 +193,15 @@ COPY --from=build /rootfs/usr/local/bin/amneziawg-go /usr/local/bin/amneziawg-go
 COPY --from=build /rootfs/usr/local/bin/awg /usr/local/bin/awg
 COPY --from=build /rootfs/usr/local/bin/awg3-parser-validate /usr/local/bin/awg3-parser-validate
 COPY --from=build /rootfs/etc/awg3/runtime-artifacts.json /etc/awg3/runtime-artifacts.json
-ENTRYPOINT ["/gateway"]
+COPY build/bootstrap-entrypoint.sh /usr/local/bin/bootstrap-entrypoint
+RUN chmod 0755 /usr/local/bin/bootstrap-entrypoint
+ENTRYPOINT ["/usr/local/bin/bootstrap-entrypoint"]
 
 FROM runtime AS smoke
 COPY build/smoke/ /smoke/
 COPY --from=build /rootfs/etc/awg3/runtime-artifacts-smoke.json /etc/awg3/runtime-artifacts-smoke.json
 RUN set -eux; \
+	chmod 0755 /smoke/bootstrap-boundary.sh; \
 	chmod 0600 /smoke/awg3.json /smoke/secrets.json; \
 	chmod 0755 /smoke/runtime-smoke.sh /smoke/bin/amneziawg-go /smoke/bin/awg /smoke/bin/ip /smoke/bin/sysctl; \
 	apt-get update; \
@@ -211,4 +214,5 @@ RUN set -eux; \
 	/usr/local/bin/awg3-parser-validate /smoke/setconf.conf; \
 	/usr/sbin/ip -Version >/dev/null; \
 	/usr/sbin/sysctl --version >/dev/null; \
+	/smoke/bootstrap-boundary.sh; \
 	/smoke/runtime-smoke.sh
