@@ -48,7 +48,7 @@ if [ -z "${child_pid}" ]; then
 fi
 
 # Supervisor.Run starts the status listener only after Runtime.Start has
-# completed its apply and readiness checks.  Do not race shutdown against
+# completed its apply and readiness checks. Do not race shutdown against
 # those checks merely because the child has written its pid file.
 attempts=0
 while [ ${attempts} -lt 100 ]; do
@@ -66,6 +66,26 @@ done
 if [ ${attempts} -ge 100 ]; then
 	cat "${STATE_DIR}/gateway.log"
 	echo "gateway status listener did not become ready" >&2
+	exit 1
+fi
+
+ready_attempts=0
+while [ ${ready_attempts} -lt 100 ]; do
+	if curl --fail --silent --show-error --max-time 1 http://127.0.0.1:18080/healthz >/dev/null 2>&1; then
+		break
+	fi
+	if ! kill -0 "${gateway_pid}" 2>/dev/null; then
+		cat "${STATE_DIR}/gateway.log"
+		echo "gateway exited before healthz became ready" >&2
+		exit 1
+	fi
+	ready_attempts=$((ready_attempts + 1))
+	sleep 0.1
+done
+
+if [ ${ready_attempts} -ge 100 ]; then
+	cat "${STATE_DIR}/gateway.log"
+	echo "healthz did not become ready" >&2
 	exit 1
 fi
 

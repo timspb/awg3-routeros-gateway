@@ -202,7 +202,7 @@ RUN set -eux; \
 	chmod 0600 /smoke/awg3.json /smoke/secrets.json; \
 	chmod 0755 /smoke/runtime-smoke.sh /smoke/bin/amneziawg-go /smoke/bin/awg /smoke/bin/ip /smoke/bin/sysctl; \
 	apt-get update; \
-	apt-get install -y --no-install-recommends file; \
+	apt-get install -y --no-install-recommends curl file; \
 	rm -rf /var/lib/apt/lists/*; \
 	file /gateway /usr/local/bin/amneziawg-go /usr/local/bin/awg /usr/local/bin/awg3-parser-validate /usr/sbin/ip /usr/sbin/sysctl; \
 	/gateway --help >/dev/null; \
