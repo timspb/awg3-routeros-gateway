@@ -88,6 +88,7 @@ func run(ctx context.Context, args []string) error {
 		DebugInterfaceOverride: *runtimeInterfaceDebug,
 		Stdout:                 prefixedWriter{dst: os.Stderr, prefix: "[amneziawg-go stdout] "},
 		Stderr:                 prefixedWriter{dst: os.Stderr, prefix: "[amneziawg-go stderr] "},
+		StdoutLimit:            16 * 1024,
 		StopTimeout:            5 * time.Second,
 		KillTimeout:            2 * time.Second,
 		EndpointExclusion:      runtime.NewRouteEndpointExclusionAdapter(),
