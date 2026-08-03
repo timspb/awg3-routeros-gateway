@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -87,7 +88,7 @@ func run(ctx context.Context, args []string) error {
 		Preflight:              canonicalPreflight,
 		DebugInterfaceOverride: *runtimeInterfaceDebug,
 		Stdout:                 io.Discard,
-		Stderr:                 io.Discard,
+		Stderr:                 log.New(os.Stderr, "[amneziawg-go stderr] ", 0).Writer(),
 		StopTimeout:            5 * time.Second,
 		KillTimeout:            2 * time.Second,
 		EndpointExclusion:      runtime.NewRouteEndpointExclusionAdapter(),
