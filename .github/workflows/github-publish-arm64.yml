@@ -9,9 +9,9 @@ permissions:
 
 env:
   IMAGE_REF: ghcr.io/timspb/awg3-routeros-gateway
-  IMAGE_TAG: c1-9ef68168-arm64
+  IMAGE_TAG: c1-5cb93306-arm64
   IMAGE_ALIAS: main-arm64
-  GATEWAY_SOURCE_COMMIT: 9ef68168a19a1ef7f88c34cd4c64e8f20a5f0e04
+  GATEWAY_SOURCE_COMMIT: 5cb93306e1ba0cdc80835fcf1b8bec6202f17d39
 
 jobs:
   publish-arm64:
