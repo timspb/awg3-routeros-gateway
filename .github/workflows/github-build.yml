@@ -90,6 +90,7 @@ jobs:
           if-no-files-found: ignore
 
   resource-baseline:
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     permissions:
