@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -87,8 +86,8 @@ func run(ctx context.Context, args []string) error {
 		ParserTimeout:          *parserTimeout,
 		Preflight:              canonicalPreflight,
 		DebugInterfaceOverride: *runtimeInterfaceDebug,
-		Stdout:                 io.Discard,
-		Stderr:                 log.New(os.Stderr, "[amneziawg-go stderr] ", 0).Writer(),
+		Stdout:                 prefixedWriter{dst: os.Stderr, prefix: "[amneziawg-go stdout] "},
+		Stderr:                 prefixedWriter{dst: os.Stderr, prefix: "[amneziawg-go stderr] "},
 		StopTimeout:            5 * time.Second,
 		KillTimeout:            2 * time.Second,
 		EndpointExclusion:      runtime.NewRouteEndpointExclusionAdapter(),
@@ -180,6 +179,18 @@ func run(ctx context.Context, args []string) error {
 	default:
 		return fmt.Errorf("unsupported mode %q", *mode)
 	}
+}
+
+type prefixedWriter struct {
+	dst    io.Writer
+	prefix string
+}
+
+func (w prefixedWriter) Write(p []byte) (int, error) {
+	if _, err := io.WriteString(w.dst, w.prefix); err != nil {
+		return 0, err
+	}
+	return w.dst.Write(p)
 }
 
 func verifyGatewayProvenance(manifestPath, executablePath, embeddedCommit string) error {
